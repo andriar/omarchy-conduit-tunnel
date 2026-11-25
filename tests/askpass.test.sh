@@ -24,7 +24,6 @@ check() { # check "name" command args...
   if "$@"; then pass=$((pass + 1)); echo "PASS $name"; else fail=$((fail + 1)); echo "FAIL $name"; fi
 }
 ask() { rm -f "$ZLOG"; bash scripts/askpass.sh "$1"; }
-zenity_ran() { [[ -f $ZLOG ]]; }
 zenity_text() { grep -- '^--text=' "$ZLOG"; }
 
 # a password prompt opens the dialog and returns what was typed

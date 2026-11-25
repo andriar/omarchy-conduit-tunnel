@@ -49,5 +49,8 @@
   "notice.droppedTitle": "Tunnel dropped",
   "notice.dropped": "%1 dropped. %2",
   "notice.startFailed": "Could not change tunnel %1: %2",
-  "notice.saveFailed": "Could not save the tunnel list"
+  "notice.saveFailed": "Could not save the tunnel list",
+  "form.auto.title": "Start automatically",
+  "form.auto.on": "Starts when the shell starts and the network is up.",
+  "form.auto.off": "Start it manually."
 }

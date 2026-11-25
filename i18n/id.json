@@ -49,5 +49,8 @@
   "notice.droppedTitle": "Tunnel terputus",
   "notice.dropped": "%1 putus. %2",
   "notice.startFailed": "Gagal mengubah tunnel %1: %2",
-  "notice.saveFailed": "Gagal menyimpan daftar tunnel"
+  "notice.saveFailed": "Gagal menyimpan daftar tunnel",
+  "form.auto.title": "Mulai otomatis",
+  "form.auto.on": "Mulai saat shell menyala dan jaringan sudah aktif.",
+  "form.auto.off": "Mulai secara manual."
 }

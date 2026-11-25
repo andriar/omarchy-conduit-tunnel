@@ -5,6 +5,7 @@
 # - translations: valid JSON, no unknown keys, every key used in code is defined
 # - the shell scripts parse (and pass shellcheck when it is installed)
 # - Model.js passes its unit tests (when node is installed)
+# - the QML files pass qmllint (syntax)
 # - nothing that looks like a profile, key or real host list is committed
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -61,6 +62,29 @@ else
   echo "check: node not found, skipping tests/model.test.js"
 fi
 bash tests/askpass.test.sh >/dev/null || fail "tests/askpass.test.sh failed (run it to see why)"
+
+# QML: qmllint catches syntax errors (a stray brace in a 1000-line panel). The Omarchy modules (qs.*)
+# are not installed here, so it cannot check types or property names, only the shape of the code.
+# CI sets REQUIRE_QMLLINT=1 so a missing qmllint fails there instead of being skipped.
+qmllint_bin=""
+for c in qmllint6 qmllint /usr/lib/qt6/bin/qmllint /usr/lib/x86_64-linux-gnu/qt6/bin/qmllint; do
+  if command -v "$c" >/dev/null 2>&1; then qmllint_bin=$(command -v "$c"); break; fi
+done
+if [[ -n $qmllint_bin ]]; then
+  # Canary: a file with a syntax error must make qmllint fail, or this check proves nothing.
+  canary=$(mktemp --suffix=.qml)
+  printf 'import QtQuick\nItem {\n  function f( {\n}\n' > "$canary"
+  if timeout 60 "$qmllint_bin" "$canary" >/dev/null 2>&1; then rm -f "$canary"; fail "qmllint did not flag a syntax error in a known-bad file (this qmllint cannot be trusted)"; fi
+  rm -f "$canary"
+  if ! lint_out=$(timeout 120 "$qmllint_bin" ./*.qml 2>&1); then
+    printf '%s\n' "$lint_out" | tail -25 >&2
+    fail "qmllint reported a problem (run: qmllint ./*.qml)"
+  fi
+elif [[ ${REQUIRE_QMLLINT:-} == 1 ]]; then
+  fail "qmllint is required but not installed"
+else
+  echo "check: qmllint not found, skipping it"
+fi
 
 # Secret / profile scan.
 pattern='BEGIN (RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY|BEGIN CERTIFICATE|IdentityFile +[^ ]|\.rds\.amazonaws\.com|\.internal\.[a-z]+\b'

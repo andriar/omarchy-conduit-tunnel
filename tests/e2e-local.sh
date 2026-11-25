@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end test of the shell scripts against real systemd --user units, with a fake ssh.
-# Needs a systemd user session. Uses ports 45931-45935 and units conduit-tunnel-a1b2c30*.
+# Needs a systemd user session. Uses ports 45931-45937 and units conduit-tunnel-a1b2c30*.
 #   tests/e2e-local.sh
 # The predicates below are passed by name to check/poll_until, so shellcheck sees them as unused.
 # shellcheck disable=SC2329
@@ -12,7 +12,7 @@ pass=0
 fail=0
 FOREIGN_PID=""
 # Tunnel ids are 8 hex digits.
-ids=(a1b2c301 a1b2c302 a1b2c303 a1b2c304 a1b2c305)
+ids=(a1b2c301 a1b2c302 a1b2c303 a1b2c304 a1b2c305 a1b2c306 a1b2c307)
 
 check() { # check "name" command args...
   local name=$1
@@ -113,7 +113,29 @@ check "a stale SSH_AUTH_SOCK is not passed on" test "$(agent_seen 45931)" != "$a
 ctl "${ids[0]}" ok 45931 stop
 rm -rf "$agent_tmp" "$XDG_RUNTIME_DIR"/conduit-e2e-agent-*
 
-# 5. the status script ends with a network line (used to hold back "start automatically")
+# 5. "Ask for password": the dialog helper is wired in and nothing restarts by itself
+unit_prop() { systemctl --user show "conduit-tunnel-$1.service" -p "$2" --value; } # unit_prop id Property
+check "normal tunnel: restarts on failure" bash -c "ASKPASS= TID=${ids[0]} TARGET=ok LP=45931 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh start && [[ \$(systemctl --user show conduit-tunnel-${ids[0]}.service -p Restart --value) == on-failure ]]"
+ctl "${ids[0]}" ok 45931 stop
+ASKPASS=1 ctl "${ids[5]}" ok 45936 start
+check "askpass: tunnel comes up" poll_until 20 is_listening "${ids[5]}" 45936
+check "askpass: unit is not restarted by systemd" test "$(unit_prop "${ids[5]}" Restart)" = no
+check "askpass: ssh is pointed at askpass.sh" bash -c "systemctl --user show conduit-tunnel-${ids[5]}.service -p Environment --value | grep -q 'SSH_ASKPASS=$PWD/scripts/askpass.sh'"
+check "askpass: SSH_ASKPASS_REQUIRE=force" bash -c "systemctl --user show conduit-tunnel-${ids[5]}.service -p Environment --value | grep -q 'SSH_ASKPASS_REQUIRE=force'"
+check "askpass: BatchMode is off" bash -c "systemctl --user show conduit-tunnel-${ids[5]}.service -p ExecStart --value | grep -q 'BatchMode=no'"
+check "askpass: one password attempt only" bash -c "systemctl --user show conduit-tunnel-${ids[5]}.service -p ExecStart --value | grep -q 'NumberOfPasswordPrompts=1'"
+check "askpass: still bound to 127.0.0.1 only" test "$(ss -H -ltn 'sport = :45936' | awk '{print $4}')" = 127.0.0.1:45936
+ASKPASS=1 ctl "${ids[5]}" ok 45936 stop
+check "askpass: stop works" poll_until 10 is_stopped "${ids[5]}" 45936
+# a failing password tunnel stays failed: no retry loop, so no dialog loop
+ASKPASS=1 ctl "${ids[6]}" denied 45937 start
+check "askpass+denied: ends up failed" poll_until 20 is_failed "${ids[6]}" 45937
+sleep 3
+check "askpass+denied: systemd never restarted it" test "$(unit_prop "${ids[6]}" NRestarts)" = 0
+check "askpass: ASKPASS=0 means a normal tunnel" bash -c "ASKPASS=0 TID=${ids[5]} TARGET=ok LP=45936 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh start && [[ \$(systemctl --user show conduit-tunnel-${ids[5]}.service -p Restart --value) == on-failure ]]"
+ctl "${ids[5]}" ok 45936 stop
+
+# 6. the status script ends with a network line (used to hold back "start automatically")
 check "status script ends with an N line" test "$(SPECS='' bash scripts/tunnel-status.sh | tail -1 | cut -f1)" = N
 check "N line is 0 or 1" test "$(SPECS='' bash scripts/tunnel-status.sh | tail -1 | cut -f2)" -le 1
 

@@ -18,7 +18,7 @@
   "time.hoursMinutes": "%1 j %2 m",
   "time.daysHours": "%1 h %2 j",
   "reason.hostKey": "Host key server belum dipercaya. Sambung sekali di terminal (ssh %1) untuk menerimanya.",
-  "reason.auth": "Login ditolak. Cek kunci SSH kamu dan pastikan ssh-agent sudah memuatnya.",
+  "reason.auth": "Login ditolak. Cek kunci SSH kamu dan pastikan ssh-agent sudah memuatnya, atau password yang kamu ketik.",
   "reason.resolve": "Nama server tidak bisa ditemukan.",
   "reason.unreachable": "Server tidak terjangkau (ditolak atau waktu habis).",
   "reason.portBusy": "Port lokal sedang dipakai.",
@@ -50,6 +50,9 @@
   "notice.dropped": "%1 putus. %2",
   "notice.startFailed": "Gagal mengubah tunnel %1: %2",
   "notice.saveFailed": "Gagal menyimpan daftar tunnel",
+  "form.pw.title": "Tanya password",
+  "form.pw.on": "Dialog akan menanyakan password SSH tiap kali dinyalakan. Tidak ada yang disimpan, dan tidak pernah mulai atau restart sendiri.",
+  "form.pw.off": "Masuk dengan kunci SSH.",
   "form.auto.title": "Mulai otomatis",
   "form.auto.on": "Mulai saat shell menyala dan jaringan sudah aktif.",
   "form.auto.off": "Mulai secara manual."

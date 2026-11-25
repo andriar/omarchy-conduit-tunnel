@@ -2,6 +2,8 @@
 # End-to-end test of the shell scripts against real systemd --user units, with a fake ssh.
 # Needs a systemd user session. Uses ports 45931-45935 and units conduit-tunnel-a1b2c30*.
 #   tests/e2e-local.sh
+# The predicates below are passed by name to check/poll_until, so shellcheck sees them as unused.
+# shellcheck disable=SC2329
 set -u
 cd "$(dirname "$0")/.." || exit 1
 export CONDUIT_SSH_BIN="$PWD/tests/fake-ssh.sh" CONDUIT_RESTART_SEC=1

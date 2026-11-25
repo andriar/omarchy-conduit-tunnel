@@ -215,6 +215,27 @@ function dueForAutostart(tunnels, states, online, tried) {
   return due
 }
 
+// Autostart gives a tunnel that failed only because the server could not be reached (no route,
+// timeout, name not resolved yet: typical right after login or a resume) a few more tries.
+// `retry` maps the ids autostart started to { n: tries so far, at: ms of the last try }.
+// Waits 30 s, 60 s, 2 min, 4 min, 8 min and then gives up (a wrong key or a taken port never
+// retries: that would not change by waiting). Returns the first id due, or "".
+var AUTOSTART_RETRIES = 5
+function retryDue(tunnels, states, online, retry, now) {
+  if (!online) return ""
+  for (var i = 0; i < tunnels.length; i++) {
+    var t = tunnels[i]
+    var r = retry[t.id]
+    if (!r || t.autostart !== true || t.askPassword === true || states[t.id] === undefined) continue
+    if (stateOf(states[t.id]) !== "failed") continue
+    var key = reasonKey(states[t.id].reason)
+    if (key !== "reason.unreachable" && key !== "reason.resolve") continue
+    if (r.n >= AUTOSTART_RETRIES) continue
+    if (now - r.at >= 30000 * Math.pow(2, r.n)) return t.id
+  }
+  return ""
+}
+
 // Autostart tunnels that are already doing something (running, connecting, failed, in the way).
 // The session has dealt with them: if one is stopped later, by hand or from outside, it must
 // stay stopped. Without this, a tunnel that was already up when the shell started could be

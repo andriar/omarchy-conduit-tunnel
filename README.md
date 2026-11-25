@@ -29,7 +29,7 @@ The screenshots use made-up names and addresses.
 - **Start and stop** with a switch, or from the command line and keybindings (see below).
 - **Add, edit and delete** tunnels in the popup: a name, the SSH server, a local port, and the remote host and port.
 - **Paste an ssh command**: paste a whole `ssh -L 5433:db.example:5432 user@bastion` line into the *SSH server* field and every field fills itself in (see [Pasting an ssh command](#pasting-an-ssh-command)).
-- **Start automatically**: mark the tunnels you always need. They start when the shell starts and the network is up, once per session, so a tunnel that fails is not retried in a loop and one you stopped yourself stays stopped.
+- **Start automatically**: mark the tunnels you always need. They start when the shell starts and the network is up, once per session, and one you stopped yourself stays stopped. If the first attempt fails only because the server could not be reached (no route, timeout, name not resolved yet), it is tried again up to five times, after 30 s, 1, 2, 4 and 8 minutes. A wrong key, a changed host key or a port in use is never retried.
 - **Copy the address** (`127.0.0.1:<port>`) with one click once it is up.
 - **Failures say why**: host key not trusted yet, login refused, name does not resolve, server unreachable, local port in use.
 - **Drop notification** when a tunnel that was up goes away by itself. A tunnel you stop yourself stays quiet.
@@ -177,7 +177,7 @@ Most bastions take a key, and a key is the better choice: it needs no dialog and
 | "Cannot reach the server" | The SSH server is down, firewalled, or on another port (set it in `~/.ssh/config`). |
 | "The local port is already in use" / "Port N is already in use by another program" | Pick another local port, or stop the program using it (`ss -ltnp 'sport = :5432'`). |
 | Connected, but the database client cannot connect | The SSH server cannot reach the remote host and port you entered. Test from the SSH server itself. |
-| A tunnel marked "Start automatically" did not start | It starts once per session, as soon as there is a network. If the SSH server was not reachable yet at that moment, the first attempt fails: start the tunnel from the popup once the server can be reached. |
+| A tunnel marked "Start automatically" did not start | It starts once per session, as soon as there is a network. If the SSH server was not reachable yet, it is retried five times over about 15 minutes; after that, or for any other error, start it from the popup. The row shows why it failed. |
 | Switch turns itself off again | After five failures in two minutes systemd stops retrying. Fix the cause shown in the row, then start it again. |
 
 ## Roadmap

@@ -1,0 +1,6 @@
+# Conduit UI kit lock. Source of truth: andriar/omarchy-conduit-vpn
+# Regenerate with scripts/ui-lock.sh <version> after changing a Conduit*.qml component.
+version 1
+3261af7580977266aa1ba93f3bec0f51186de2db95b83726a0717f013ec11387  ConduitButton.qml
+0dbb19ed981ca0798f8631f64474ab22d587cb215281a947ed7ab0343387263b  ConduitSwitch.qml
+278112d387c201dc28cbbd84cddec3ce83d70e74ae11ab7b33c3b1f386b75884  ConduitToggleRow.qml

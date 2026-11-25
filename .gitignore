@@ -1,0 +1,11 @@
+# Never commit your own tunnels, keys or logs.
+tunnels.json
+*.pem
+*.key
+*.crt
+*.p12
+.env
+*.log
+*.bak
+*.png
+!docs/*.png

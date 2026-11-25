@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "conduit.tunnel",
+  "name": "Conduit Tunnel",
+  "version": "0.1.0",
+  "author": "andriar",
+  "license": "MIT",
+  "description": "SSH tunnel manager for the Omarchy bar: start and stop port forwards to databases and other private services, with status, reasons for failures, and drop notifications.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Conduit Tunnel",
+    "description": "List your SSH port forwards, start and stop them, copy their address, and get told when one drops.",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 3
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 3
+      }
+    ]
+  }
+}

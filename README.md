@@ -1,0 +1,127 @@
+# Conduit Tunnel
+
+**An SSH tunnel manager for the [Omarchy](https://omarchy.org) bar.** Keep the port forwards you use every day, such as a database behind a bastion host, one click away: start and stop them, see which are up, copy their address, and get told when one drops.
+
+It turns commands like `ssh -N -L 5432:db.example:5432 user@bastion.example.com` into a list with switches. Each tunnel runs as a `systemd --user` service, so it survives a shell restart and is restarted by systemd when it fails.
+
+Part of the **Conduit** family, with [Conduit VPN](https://github.com/andriar/omarchy-conduit-vpn). The two share one look ([DESIGN.md](https://github.com/andriar/omarchy-conduit-vpn/blob/main/DESIGN.md)).
+
+> The popup follows the language you pick under Omarchy's **Setup > Language**. English and Indonesian are included.
+
+## Features
+
+- **One list of tunnels** with live status: `Connected · 127.0.0.1:5432 · 11 min`.
+- **Start and stop** with a switch, or from the command line and keybindings (see below).
+- **Add, edit and delete** tunnels in the popup: a name, the SSH server, a local port, and the remote host and port.
+- **Copy the address** (`127.0.0.1:<port>`) with one click once it is up.
+- **Failures say why**: host key not trusted yet, login refused, name does not resolve, server unreachable, local port in use.
+- **Drop notification** when a tunnel that was up goes away by itself. A tunnel you stop yourself stays quiet.
+- **Safe by default**: listens on `127.0.0.1` only, never prompts (so it cannot hang), and gives up after five failed restarts in two minutes instead of looping forever.
+- Works with your `~/.ssh/config`: the SSH server can be a `Host` alias, so `ProxyJump`, `IdentityFile` and friends apply.
+
+## Requirements
+
+- Omarchy with shell plugins (the `omarchy plugin` command) and a `systemd --user` session (Omarchy has both).
+- The OpenSSH client (`ssh`).
+- A key that works without a prompt: loaded in `ssh-agent`, or without a passphrase. The widget runs `ssh` in batch mode.
+- `wl-clipboard` for the copy button (optional).
+
+## Install
+
+```bash
+omarchy plugin add https://github.com/andriar/omarchy-conduit-tunnel.git --enable
+```
+
+The widget lands on the right side of the bar. Move it where you like:
+
+```bash
+omarchy bar move conduit.tunnel --after conduit.vpn
+```
+
+Update and remove:
+
+```bash
+omarchy plugin update conduit.tunnel
+omarchy plugin remove conduit.tunnel
+```
+
+Your tunnel list is kept in `~/.config/omarchy-conduit-tunnel/tunnels.json` and is not touched when you remove the widget.
+
+### Manual install
+
+```bash
+git clone https://github.com/andriar/omarchy-conduit-tunnel.git ~/.config/omarchy/plugins/conduit.tunnel
+omarchy plugin enable conduit.tunnel
+```
+
+## Using it
+
+1. Click the arrows icon in the bar to open the list.
+2. **+** adds a tunnel. Fill in a name, the SSH server (`user@host` or a `Host` from `~/.ssh/config`), the local port to listen on, and the host and port to reach from the SSH server. Press **Save & Start**.
+3. The switch starts and stops a tunnel. Point your database client at `127.0.0.1:<local port>`.
+4. The gear edits or deletes a tunnel.
+
+**First connection to a server.** The widget never accepts an unknown host key for you. If the row says the host key is not trusted, run `ssh user@host` once in a terminal, answer `yes`, and start the tunnel again.
+
+### From the command line
+
+```bash
+omarchy-shell conduit.tunnel status                 # id, name, state, address
+omarchy-shell conduit.tunnel start "Staging database"
+omarchy-shell conduit.tunnel stop  "Staging database"
+omarchy-shell conduit.tunnel toggle                 # open or close the popup
+```
+
+Bind any of these to a key in your Hyprland config. Each tunnel is also a normal systemd unit, named `conduit-tunnel-<id>.service`:
+
+```bash
+systemctl --user status conduit-tunnel-<id>
+journalctl --user -u conduit-tunnel-<id>
+```
+
+## Security and privacy
+
+- **No secrets are stored.** There are no passwords: authentication is your SSH key.
+- Tunnels are saved in `~/.config/omarchy-conduit-tunnel/tunnels.json`, readable only by you (`0600`). It holds hostnames, so it is never part of this repository, and `.gitignore` and `scripts/check.sh` keep it out.
+- Tunnels listen on **`127.0.0.1` only**, never on `0.0.0.0`.
+- Every value you type is validated against a strict pattern, both in the popup and again in the shell script, before it reaches an `ssh` command line. A server name that starts with `-` or contains spaces or shell characters is rejected.
+- Host keys are checked as usual (`StrictHostKeyChecking` is not weakened) and `BatchMode` is on, so nothing waits for a prompt nobody can answer.
+- The widget makes **no network requests** of its own beyond the `ssh` connections you configure.
+- Omarchy shell plugins run **unsandboxed**. Read the code before you install any plugin, including this one.
+- Do not post your `tunnels.json`, `~/.ssh/config` or logs in issues: they contain your real hostnames.
+
+## Troubleshooting
+
+| What the row says | Likely cause |
+|---|---|
+| "The server's host key is not trusted yet" | First connection to that server. Run `ssh user@host` once in a terminal and accept the key. |
+| "Login refused" | Your key is not accepted, or `ssh-agent` does not have it loaded. Try `ssh user@host` in a terminal. |
+| "Cannot resolve the server name" | A typo in the SSH server, or no DNS or network. |
+| "Cannot reach the server" | The SSH server is down, firewalled, or on another port (set it in `~/.ssh/config`). |
+| "The local port is already in use" / "Port N is already in use by another program" | Pick another local port, or stop the program using it (`ss -ltnp 'sport = :5432'`). |
+| Connected, but the database client cannot connect | The SSH server cannot reach the remote host and port you entered. Test from the SSH server itself. |
+| Switch turns itself off again | After five failures in two minutes systemd stops retrying. Fix the cause shown in the row, then start it again. |
+
+## Roadmap
+
+- Start chosen tunnels at login.
+- Import `LocalForward` entries from `~/.ssh/config`.
+- Screenshots.
+
+## Contributing
+
+`main` is protected: open a pull request. Run `scripts/check.sh` before you push (CI runs the same script). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+## Instalasi singkat (Bahasa Indonesia)
+
+```bash
+omarchy plugin add https://github.com/andriar/omarchy-conduit-tunnel.git --enable
+```
+
+Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan, lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Tampilan mengikuti bahasa Omarchy (Setup > Language).

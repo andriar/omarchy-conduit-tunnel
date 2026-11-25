@@ -53,6 +53,111 @@ function clean(raw) {
   return out
 }
 
+// ---- Pasting a whole `ssh -L ...` command into the form ----
+// The pasted text is only READ into fields. It is never run and never reaches a shell, and
+// every field still goes through validate() before anything is saved. What the widget cannot
+// represent (-o, -J, -i, -R, -D, a remote command, an SSH port other than 22) is refused by
+// name, never dropped silently.
+
+// Does this look like the start of an ssh command? (A leading "$ " from a copied prompt is fine.)
+function looksLikeSsh(text) {
+  return /^\s*(\$\s+)?(\S*\/)?ssh\s/.test(String(text === undefined ? "" : text))
+}
+
+// Split text the way a shell would (quotes, backslash escapes) but expand nothing.
+// null when something a shell would act on appears ($var, `cmd`, ; | & < > ( ) { } ! #),
+// or when a quote is left open. That is one command, pasted on its own, or nothing.
+function shellSplit(s) {
+  var out = [], cur = "", has = false, q = ""
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i)
+    if (q === "'") { if (c === "'") q = ""; else cur += c; continue }
+    if (q === '"') {
+      if (c === '"') q = ""
+      else if (c === "$" || c === "`") return null
+      else if (c === "\\" && (s.charAt(i + 1) === '"' || s.charAt(i + 1) === "\\")) { cur += s.charAt(i + 1); i++ }
+      else cur += c
+      continue
+    }
+    if (c === "'" || c === '"') { q = c; has = true; continue }
+    if (c === " " || c === "\t" || c === "\n" || c === "\r") {
+      if (has || cur !== "") { out.push(cur); cur = ""; has = false }
+      continue
+    }
+    if (c === "\\") {
+      var n = s.charAt(i + 1)
+      if (n === "\n" || n === "\r") { i++; continue }  // line continuation
+      if (n === "") return null
+      cur += n; has = true; i++
+      continue
+    }
+    if ("$`;|&<>(){}!#".indexOf(c) >= 0) return null
+    cur += c
+  }
+  if (q !== "") return null
+  if (has || cur !== "") out.push(cur)
+  return out
+}
+
+function suggestName(host) {
+  var n = /^[0-9.]+$/.test(host) ? host : String(host).split(".")[0]
+  return n.length > 40 ? n.slice(0, 40) : n
+}
+
+// -> { ok: true, target, localPort, remoteHost, remotePort, name, notes: [catalog keys] }
+//  | { ok: false, error: catalog key, arg?: text to show in the message }
+function parseSshCommand(text) {
+  // A prompt that came along with the copy ("$ ssh ...") is dropped. "$HOME" is not a prompt.
+  var toks = shellSplit(String(text === undefined ? "" : text).trim().replace(/^[$>](\s+|$)/, ""))
+  if (toks === null) return { ok: false, error: "paste.err.unsafe" }
+  if (!toks.length || !/^(.*\/)?ssh$/.test(toks[0])) return { ok: false, error: "paste.err.notSsh" }
+
+  var IGNORED = "NfqvTnx46Cg"          // flags that change nothing we care about
+  var forwards = [], positional = [], loginUser = "", port = "22", ended = false
+  for (var i = 1; i < toks.length; i++) {
+    var tok = toks[i]
+    if (ended || tok.charAt(0) !== "-" || tok === "-") { positional.push(tok); continue }
+    if (tok === "--") { ended = true; continue }
+    for (var j = 1; j < tok.length; j++) {
+      var ch = tok.charAt(j)
+      if (IGNORED.indexOf(ch) >= 0) continue
+      if (ch === "L" || ch === "p" || ch === "l") {
+        var arg = tok.slice(j + 1)
+        if (arg === "") {
+          i++
+          arg = toks[i]
+          if (arg === undefined) return { ok: false, error: "paste.err.option", arg: "-" + ch }
+        }
+        if (ch === "L") forwards.push(arg)
+        else if (ch === "p") port = arg
+        else loginUser = arg
+        break
+      }
+      return { ok: false, error: "paste.err.option", arg: "-" + ch }
+    }
+  }
+
+  if (port !== "22") return { ok: false, error: "paste.err.port", arg: port }
+  if (positional.length === 0) return { ok: false, error: "paste.err.noHost" }
+  if (positional.length > 1) return { ok: false, error: "paste.err.command" }
+  var target = positional[0]
+  if (loginUser !== "" && target.indexOf("@") < 0) target = loginUser + "@" + target
+  if (forwards.length === 0) return { ok: false, error: "paste.err.noForward" }
+
+  var m = /^(?:(\[[^\]]+\]|[^:\[\]]*):)?([0-9]+):(\[[^\]]+\]|[^:\[\]]+):([0-9]+)$/.exec(forwards[0])
+  if (!m) return { ok: false, error: "paste.err.forward", arg: forwards[0] }
+
+  // The widget listens on 127.0.0.1 only. A wider bind address is not carried over.
+  var notes = []
+  var bind = m[1]
+  if (bind !== undefined && bind !== "" && bind !== "127.0.0.1" && bind !== "localhost") notes.push("paste.note.bind")
+  if (forwards.length > 1) notes.push("paste.note.more")
+  return {
+    ok: true, target: target, localPort: Number(m[2]), remoteHost: m[3], remotePort: Number(m[4]),
+    name: suggestName(m[3]), notes: notes
+  }
+}
+
 // Lines from tunnel-status.sh: T <id> <active> <sub> <restarts> <since> <listening> <reason>
 function parsePoll(text) {
   var states = {}

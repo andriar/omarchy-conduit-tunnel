@@ -41,7 +41,8 @@ for f in i18n/*.json; do
 done
 # Keys used in code: strings.t("...") in QML, and the catalog keys Model.js returns.
 used=$( { grep -o 'strings\.t("[^"]*")' ./*.qml | sed -E 's/.*strings\.t\("([^"]*)"\)/\1/'
-          grep -o '"\(reason\|val\|time\)\.[A-Za-z]*"' Model.js | tr -d '"'; } | sort -u)
+          grep -o '"\(reason\|val\|time\)\.[A-Za-z]*"' Model.js | tr -d '"'
+          grep -o '"paste\.[A-Za-z.]*"' Model.js | tr -d '"'; } | sort -u)
 while IFS= read -r key; do
   [[ -z $key ]] && continue
   jq -e --arg k "$key" 'has($k)' i18n/en.json >/dev/null || fail "code uses the string key \"$key\" but en.json does not define it"

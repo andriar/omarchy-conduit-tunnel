@@ -35,6 +35,8 @@ Panel {
   property string view: "list"
   property string editId: ""
   property string formError: ""
+  property string formNote: ""
+  property bool pasteError: false
   property bool saving: false
   property bool confirmDelete: false
   property bool startAfterSave: false
@@ -214,6 +216,8 @@ Panel {
   function openEdit(id) {
     root.editId = id
     root.formError = ""
+    root.formNote = ""
+    root.pasteError = false
     root.confirmDelete = false
     root.view = "edit"
     Qt.callLater(function() { root.fillForm(id) })
@@ -240,6 +244,8 @@ Panel {
     root.view = "list"
     root.confirmDelete = false
     root.formError = ""
+    root.formNote = ""
+    root.pasteError = false
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
   }
 
@@ -249,6 +255,28 @@ Panel {
     var host = String(hostFieldItem.text).trim()
     if (server === "" || host === "" || String(localFieldItem.text) === "" || String(portFieldItem.text) === "") return ""
     return strings.t("form.summary").arg(localFieldItem.text).arg(host).arg(portFieldItem.text).arg(server)
+  }
+
+  // The SSH server field got a whole `ssh -L ...` command: read it into the fields.
+  // The text is only parsed (see Model.parseSshCommand). It is never run.
+  function applyPaste(text) {
+    var r = Model.parseSshCommand(text)
+    if (!r.ok) {
+      root.formNote = ""
+      root.pasteError = true
+      root.formError = r.arg !== undefined ? strings.t(r.error).arg(r.arg) : strings.t(r.error)
+      return
+    }
+    root.pasteError = false
+    root.formError = ""
+    serverFieldItem.text = r.target
+    localFieldItem.text = String(r.localPort)
+    hostFieldItem.text = r.remoteHost
+    portFieldItem.text = String(r.remotePort)
+    if (String(nameFieldItem.text).trim() === "") nameFieldItem.text = r.name
+    var notes = [strings.t("paste.ok")]
+    for (var i = 0; i < r.notes.length; i++) notes.push(strings.t(r.notes[i]))
+    root.formNote = notes.join(" ")
   }
 
   function saveForm(startAfter) {
@@ -281,6 +309,8 @@ Panel {
     if (!found) list.push(candidate)
 
     root.formError = ""
+    root.formNote = ""
+    root.pasteError = false
     root.saving = true
     root.tunnels = list
     root.startAfterSave = startAfter === true
@@ -741,6 +771,11 @@ Panel {
             horizontalPadding: Style.spacing.controlGap
             verticalPadding: Style.spacing.controlPaddingY
             onAccepted: localField.forceActiveFocus()
+            // A whole ssh command pasted here fills in every field.
+            onTextChanged: {
+              if (Model.looksLikeSsh(text)) root.applyPaste(text)
+              else if (root.pasteError) { root.formError = ""; root.pasteError = false }
+            }
             Keys.onEscapePressed: root.closeEdit()
           }
         }
@@ -859,6 +894,17 @@ Panel {
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
           text: root.formError
+        }
+
+        Text {
+          visible: root.view === "edit" && root.formNote !== ""
+          textFormat: Text.PlainText
+          width: parent.width
+          wrapMode: Text.WordWrap
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          text: root.formNote
         }
 
         ConduitToggleRow {

@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8").replace(/^\.pragma library\s*$/m, "");
-const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart };")();
+const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart, parseSshCommand, looksLikeSsh, shellSplit };")();
 
 let pass = 0, fail = 0;
 const eq = (a, b, m) => { const ok = JSON.stringify(a) === JSON.stringify(b); ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + m + (ok ? "" : `  got ${JSON.stringify(a)} want ${JSON.stringify(b)}`)); };
@@ -136,6 +136,100 @@ eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\n"), false, "no N line
   M.detectDrops(tn, up, prev, manual, "");
   eq(M.detectDrops(tn, {}, prev, manual, ""), ["aaaaaaaa", "bbbbbbbb"], "unit vanished: both dropped");
 }
+
+// ---- pasting a whole ssh command ----
+const P = (s) => M.parseSshCommand(s);
+const okFields = (r) => r.ok ? { target: r.target, lp: r.localPort, rh: r.remoteHost, rp: r.remotePort } : r;
+const dbOk = { target: "user@bastion.example.com", lp: 5433, rh: "db.example", rp: 5432 };
+
+// the usual command, as copied from a chat or a doc
+eq(okFields(P("ssh -L 0.0.0.0:5433:db.example:5432 -p 22 user@bastion.example.com")), dbOk, "paste: bind address, -p 22, user@host");
+eq(okFields(P("ssh -N -L 5433:db.example:5432 user@bastion.example.com")), dbOk, "paste: plain -N -L");
+eq(okFields(P("ssh -L5433:db.example:5432 -p22 user@bastion.example.com")), dbOk, "paste: attached -L5433... and -p22");
+eq(okFields(P("ssh -fNL 5433:db.example:5432 user@bastion.example.com")), dbOk, "paste: clustered flags -fNL");
+eq(okFields(P("ssh -L 5433:db.example:5432 -l user bastion.example.com")), dbOk, "paste: -l user host");
+eq(okFields(P("ssh -L 5433:db.example:5432 -- user@bastion.example.com")), dbOk, "paste: -- before the host");
+eq(okFields(P('ssh -L "5433:db.example:5432" \'user@bastion.example.com\'')), dbOk, "paste: quoted arguments");
+eq(okFields(P("$ ssh -L 5433:db.example:5432 user@bastion.example.com")), dbOk, "paste: leading $ prompt");
+eq(okFields(P("/usr/bin/ssh -L 5433:db.example:5432 user@bastion.example.com")), dbOk, "paste: full path to ssh");
+eq(okFields(P("ssh \\\n  -L 5433:db.example:5432 \\\n  user@bastion.example.com")), dbOk, "paste: backslash line continuation");
+eq(okFields(P("  ssh -L 5433:db.example:5432 user@bastion.example.com  \n")), dbOk, "paste: surrounding whitespace");
+eq(P("ssh -L 5433:db.example:5432 my-alias").target, "my-alias", "paste: an ssh_config Host alias is a valid target");
+eq(P("ssh -Nv -4 -C -L 5433:db.example:5432 user@host").ok, true, "paste: harmless flags are ignored");
+
+// the widget listens on 127.0.0.1 only: a wider bind is noted, a loopback one is not
+eq(P("ssh -L 0.0.0.0:5433:db.example:5432 user@host").notes, ["paste.note.bind"], "paste: 0.0.0.0 is noted");
+eq(P("ssh -L *:5433:db.example:5432 user@host").notes, ["paste.note.bind"], "paste: * is noted");
+eq(P("ssh -L [::1]:5433:db.example:5432 user@host").notes, ["paste.note.bind"], "paste: [::1] is noted");
+eq(P("ssh -L 127.0.0.1:5433:db.example:5432 user@host").notes, [], "paste: 127.0.0.1 is not noted");
+eq(P("ssh -L localhost:5433:db.example:5432 user@host").notes, [], "paste: localhost is not noted");
+eq(P("ssh -L 5433:db.example:5432 user@host").notes, [], "paste: no bind address, no note");
+
+// several forwards: the first one wins, and we say so
+{
+  const r = P("ssh -L 5433:db.example:5432 -L 6379:cache.example:6379 user@host");
+  eq([r.ok, r.remoteHost, r.notes], [true, "db.example", ["paste.note.more"]], "paste: more than one -L keeps the first and notes it");
+}
+
+// a name is suggested from the remote host
+eq(P("ssh -L 5433:mydb.abc123.ap-southeast-1.rds.amazonaws.com:5432 user@host").name, "mydb", "paste: name = first label of the host");
+eq(P("ssh -L 5433:10.0.5.7:5432 user@host").name, "10.0.5.7", "paste: name = the IP for an IPv4 host");
+eq(P("ssh -L 5433:" + "x".repeat(60) + ".example:5432 user@host").name.length, 40, "paste: suggested name is cut to 40 characters");
+
+// anything that is not one plain ssh command
+for (const bad of ["", "   ", "ls -la", "scp a b", "sshpass -p x ssh -L 5433:db:5432 host", "echo ssh -L 5433:db:5432 host"])
+  eq(P(bad).error, "paste.err.notSsh", "paste: not an ssh command: " + JSON.stringify(bad));
+for (const bad of [
+  "ssh -L 5433:db:5432 host; rm -rf ~", "ssh -L 5433:db:5432 host && id", "ssh -L 5433:db:5432 host | tee x",
+  "ssh -L 5433:$(id):5432 host", "ssh -L 5433:`id`:5432 host", "ssh -L 5433:$HOST:5432 host", 'ssh -L "5433:$HOST:5432" host',
+  "ssh -L 5433:db:5432 host > /tmp/x", "ssh -L 5433:db:5432 host < /etc/passwd", "ssh -L 5433:db:5432 (host)",
+  "ssh -L 5433:db:5432 'host", 'ssh -L 5433:db:5432 "host', "ssh -L 5433:db:5432 host #x", "ssh -L 5433:db:5432 host\\"])
+  eq(P(bad).error, "paste.err.unsafe", "paste: refused as unsafe: " + JSON.stringify(bad));
+
+// options we cannot honour are named, never dropped
+for (const [cmd, opt] of [
+  ["ssh -o ProxyCommand=evil -L 5433:db:5432 user@host", "-o"], ["ssh -oProxyCommand=evil -L 5433:db:5432 user@host", "-o"],
+  ["ssh -J jump -L 5433:db:5432 user@host", "-J"], ["ssh -i key -L 5433:db:5432 user@host", "-i"],
+  ["ssh -R 9000:localhost:80 user@host", "-R"], ["ssh -D 1080 user@host", "-D"], ["ssh -W db:5432 user@host", "-W"],
+  ["ssh -F /tmp/cfg -L 5433:db:5432 user@host", "-F"], ["ssh -A -L 5433:db:5432 user@host", "-A"], ["ssh -Y -L 5433:db:5432 user@host", "-Y"],
+  ["ssh -L 5433:db:5432 user@host -oLocalCommand=x", "-o"], ["ssh -fNo ProxyCommand=x -L 5433:db:5432 user@host", "-o"],
+  ["ssh -L", "-L"], ["ssh -L 5433:db:5432 user@host -p", "-p"]])
+  eq([P(cmd).error, P(cmd).arg], ["paste.err.option", opt], "paste: unsupported option " + opt + " in " + JSON.stringify(cmd));
+
+eq([P("ssh -p 2222 -L 5433:db:5432 user@host").error, P("ssh -p 2222 -L 5433:db:5432 user@host").arg], ["paste.err.port", "2222"], "paste: SSH port other than 22 is refused");
+eq(P("ssh -L 5433:db:5432 user@host ls").error, "paste.err.command", "paste: a remote command is refused");
+eq(P("ssh -L 5433:db:5432 user@host extra").error, "paste.err.command", "paste: extra words after the host are refused");
+eq(P("ssh -L 5433:db:5432").error, "paste.err.noHost", "paste: no host");
+eq(P("ssh user@host").error, "paste.err.noForward", "paste: no -L");
+for (const bad of ["5433:db", "5433", "db:5432", "x:5433:db:5432:9", "5433:db:port", "a:b:c:d:e"])
+  eq(P("ssh -L " + bad + " user@host").error, "paste.err.forward", "paste: bad forward spec " + JSON.stringify(bad));
+
+// a pasted value that starts with '-' must still be stopped by validate(), not by luck
+{
+  const r = P("ssh -L 5433:db.example:5432 -- -oProxyCommand=evil");
+  eq(r.ok, true, "paste: '--' makes a dash-word a host name for the parser");
+  eq(M.validate({ ...good, name: r.name, target: r.target, localPort: r.localPort, remoteHost: r.remoteHost, remotePort: r.remotePort }), "val.target", "paste: validate() still rejects a target that starts with '-'");
+}
+{
+  const r = P("ssh -L 80:db.example:5432 user@host");
+  eq(M.validate({ ...good, name: r.name, target: r.target, localPort: r.localPort, remoteHost: r.remoteHost, remotePort: r.remotePort }), "val.localPort", "paste: a privileged local port still fails validate()");
+}
+{
+  const r = P("ssh -L 5433:db.example:5432 user@bastion.example.com");
+  eq(M.validate({ id: "aaaaaaaa", name: r.name, target: r.target, localPort: r.localPort, remoteHost: r.remoteHost, remotePort: r.remotePort }, []), "", "paste: a good command gives a valid tunnel");
+}
+
+eq(P("$ $HOME/bin/ssh -L 5433:db:5432 user@host").error, "paste.err.unsafe", "paste: a $variable is not mistaken for a prompt");
+eq(P("$ ").error, "paste.err.notSsh", "paste: a lone prompt is not ssh");
+eq(P("> ssh -L 5433:db.example:5432 user@bastion.example.com").ok, true, "paste: leading > prompt");
+
+// when to react to a paste
+for (const yes of ["ssh -L 1:a:2 h", "  ssh -L 1:a:2 h", "$ ssh -L 1:a:2 h", "/usr/bin/ssh -L 1:a:2 h", "ssh\t-L 1:a:2 h", "ssh -N"])
+  eq(M.looksLikeSsh(yes), true, "looksLikeSsh: " + JSON.stringify(yes));
+for (const no of ["", "user@host", "bastion", "my-ssh-alias", "sshpass -p x ssh h", "ssh", "sshd -L", "user@ssh.example.com"])
+  eq(M.looksLikeSsh(no), false, "not an ssh paste: " + JSON.stringify(no));
+eq(M.shellSplit("a 'b c' \"d e\" f\\ g"), ["a", "b c", "d e", "f g"], "shellSplit: quotes and escaped space");
+eq(M.shellSplit("a ''"), ["a", ""], "shellSplit: an empty quoted argument is kept");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

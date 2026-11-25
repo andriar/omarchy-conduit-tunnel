@@ -27,7 +27,7 @@
   "form.name": "Name",
   "form.namePlaceholder": "Staging database",
   "form.server": "SSH server",
-  "form.serverPlaceholder": "user@bastion.example.com",
+  "form.serverPlaceholder": "user@bastion.example.com, or paste an ssh -L command",
   "form.localPort": "Local port",
   "form.remoteHost": "Remote host",
   "form.remoteHostPlaceholder": "db.internal.example",
@@ -55,5 +55,16 @@
   "form.pw.off": "Log in with your SSH key.",
   "form.auto.title": "Start automatically",
   "form.auto.on": "Starts when the shell starts and the network is up.",
-  "form.auto.off": "Start it manually."
+  "form.auto.off": "Start it manually.",
+  "paste.ok": "Filled in from the ssh command. Check it, then save.",
+  "paste.note.bind": "It listens on 127.0.0.1 only: the wider bind address was not used.",
+  "paste.note.more": "Only the first -L was taken: one tunnel is one forward.",
+  "paste.err.unsafe": "Paste just one ssh command, without ; | & $ or backticks.",
+  "paste.err.notSsh": "That does not look like an ssh command.",
+  "paste.err.option": "The option %1 cannot be used here. Put it in ~/.ssh/config and use that Host as the SSH server.",
+  "paste.err.port": "SSH port %1 is not supported here. Put it in ~/.ssh/config and use that Host as the SSH server.",
+  "paste.err.command": "There is something after the host. Paste only the ssh -L part.",
+  "paste.err.noHost": "No SSH server found in the command.",
+  "paste.err.noForward": "No -L forward found in the command.",
+  "paste.err.forward": "Cannot read the forward \"%1\". It should look like [bind:]port:host:port."
 }

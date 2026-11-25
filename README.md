@@ -8,6 +8,21 @@ Part of the **Conduit** family, with [Conduit VPN](https://github.com/andriar/om
 
 > The popup follows the language you pick under Omarchy's **Setup > Language**. English and Indonesian are included.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/list.png" alt="The tunnel list: one tunnel up with its address and time online, one stopped, one failed with the reason" width="420"></td>
+    <td align="center"><img src="docs/edit.png" alt="Editing a tunnel: name, SSH server, local port, remote host and port, with a summary line and a delete button" width="420"></td>
+  </tr>
+  <tr>
+    <td align="center">The list</td>
+    <td align="center">Editing a tunnel</td>
+  </tr>
+</table>
+
+The screenshots use made-up names and addresses.
+
 ## Features
 
 - **One list of tunnels** with live status: `Connected · 127.0.0.1:5432 · 11 min`.
@@ -106,7 +121,6 @@ journalctl --user -u conduit-tunnel-<id>
 
 - Start chosen tunnels at login.
 - Import `LocalForward` entries from `~/.ssh/config`.
-- Screenshots.
 
 ## Contributing
 

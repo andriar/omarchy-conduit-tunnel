@@ -17,6 +17,8 @@ Thanks for helping. A few ground rules keep this small project tidy.
 - `node tests/model.test.js` covers `Model.js`: validation (including attempts to smuggle options into the `ssh` command line), parsing, states, error mapping and drop detection. `scripts/check.sh` runs it.
 - `tests/e2e-local.sh` runs the shell scripts against **real `systemd --user` units** with a fake `ssh` (`tests/fake-ssh.sh`): start, loopback-only binding, restart, stop, failures with readable reasons, and a port taken by another program. It needs a systemd user session, so CI does not run it. Run it before you change `scripts/tunnel-ctl.sh` or `scripts/tunnel-status.sh`.
 
+- `tests/e2e-real-ssh.sh` uses **real ssh**: a private `sshd` on `127.0.0.1:22222` run as you with temporary keys, a passphrase-protected key, a private `ssh-agent` and a fake database. It proves the host key check, login through the agent, and data flowing through the forward. Nothing is installed or enabled and everything is removed on exit. It needs `sshd`, `ssh-agent`, `python3` and a systemd user session, so CI does not run it.
+
 ## Trying your changes
 
 Clone the repo straight into the plugin folder. Omarchy reloads plugin code when you save a file.

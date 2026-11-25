@@ -90,6 +90,29 @@ check "foreign listener: unit inactive" test "$(col "${ids[4]}" 45935 3)" = inac
 check "foreign listener: port listening" test "$(col "${ids[4]}" 45935 7)" = 1
 check "never-started tunnel reports dead" test "$(col "${ids[4]}" 45935 4)" = dead
 
+# 4. ssh-agent discovery: the unit gets the agent socket even when the shell has no SSH_AUTH_SOCK
+agent_tmp=$(mktemp -d)
+make_socket() { python3 -c "import socket, sys; s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])" "$1"; }
+agent_seen() { cat "$XDG_RUNTIME_DIR/conduit-e2e-agent-$1" 2>/dev/null; }
+wait_for_file() { [[ -f "$XDG_RUNTIME_DIR/conduit-e2e-agent-$1" ]]; }
+start_with_agent() { # start_with_agent port  (reads SSH_AUTH_SOCK / CONDUIT_AGENT_DIR from the caller)
+  rm -f "$XDG_RUNTIME_DIR/conduit-e2e-agent-$1"
+  ctl "${ids[0]}" ok "$1" restart
+  poll_until 20 wait_for_file "$1"
+}
+make_socket "$agent_tmp/ssh-agent.socket"
+unset SSH_AUTH_SOCK
+CONDUIT_AGENT_DIR=$agent_tmp start_with_agent 45931
+check "agent found in the runtime dir when SSH_AUTH_SOCK is unset" test "$(agent_seen 45931)" = "$agent_tmp/ssh-agent.socket"
+make_socket "$agent_tmp/explicit.sock"
+SSH_AUTH_SOCK=$agent_tmp/explicit.sock CONDUIT_AGENT_DIR=$agent_tmp start_with_agent 45931
+check "an explicit SSH_AUTH_SOCK wins" test "$(agent_seen 45931)" = "$agent_tmp/explicit.sock"
+rm -f "$agent_tmp/ssh-agent.socket"
+SSH_AUTH_SOCK=$agent_tmp/stale.sock CONDUIT_AGENT_DIR=$agent_tmp start_with_agent 45931
+check "a stale SSH_AUTH_SOCK is not passed on" test "$(agent_seen 45931)" != "$agent_tmp/stale.sock"
+ctl "${ids[0]}" ok 45931 stop
+rm -rf "$agent_tmp" "$XDG_RUNTIME_DIR"/conduit-e2e-agent-*
+
 echo
 echo "$pass passed, $fail failed"
 exit $(( fail > 0 ))

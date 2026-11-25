@@ -53,6 +53,7 @@ Panel {
   // tried once per session.
   property bool online: false
   property var autostartTried: ({})
+  property var autostartRetry: ({})   // id -> { n, at }: tunnels autostart started and may retry
   property bool autostartForm: false
   property bool askPasswordForm: false
 
@@ -169,7 +170,17 @@ Panel {
     if (due.length === 0) return
     var t = root.tunnelById(due[0])
     root.autostartTried[t.id] = true
-    root.runCtl("start", t)
+    if (root.runCtl("start", t, true)) root.autostartRetry[t.id] = { n: 0, at: Date.now() }
+  }
+
+  // A tunnel autostart started that failed because the server was unreachable is tried again a few times.
+  function runAutostartRetry() {
+    if (ctlProc.running || !root.loaded || root.saving) return
+    var id = Model.retryDue(root.tunnels, root.states, root.online, root.autostartRetry, Date.now())
+    if (id === "") return
+    var t = root.tunnelById(id)
+    var n = root.autostartRetry[id].n + 1
+    if (root.runCtl("start", t, true)) root.autostartRetry[id] = { n: n, at: Date.now() }
   }
 
   function onPolled(text) {
@@ -184,7 +195,9 @@ Panel {
       root.notify(strings.t("notice.droppedTitle"),
         strings.t("notice.dropped").arg(t.name).arg(root.reasonText(t, root.states[t.id])), true)
     }
+    for (var k in root.autostartRetry) if (Model.stateOf(root.states[k]) === "up") delete root.autostartRetry[k]
     root.runAutostart()
+    root.runAutostartRetry()
   }
 
   // Names are the user's own text, but may come from a pasted command: "--" stops a leading "-"
@@ -200,8 +213,10 @@ Panel {
 
   // ---- start / stop --------------------------------------------------------
 
-  function runCtl(act, t) {
+  function runCtl(act, t, fromAutostart) {
     if (ctlProc.running || !t) return false
+    // Anything the user does with a tunnel ends autostart's retries for it.
+    if (fromAutostart !== true) delete root.autostartRetry[t.id]
     // Whatever the user (or IPC) does with a tunnel, autostart has no say in it any more this session.
     root.autostartTried[t.id] = true
     root.busyId = t.id

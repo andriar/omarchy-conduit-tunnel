@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8").replace(/^\.pragma library\s*$/m, "");
-const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart, handledThisSession, parseSshCommand, looksLikeSsh, shellSplit };")();
+const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart, handledThisSession, retryDue, parseSshCommand, looksLikeSsh, shellSplit };")();
 
 let pass = 0, fail = 0;
 const eq = (a, b, m) => { const ok = JSON.stringify(a) === JSON.stringify(b); ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + m + (ok ? "" : `  got ${JSON.stringify(a)} want ${JSON.stringify(b)}`)); };
@@ -138,6 +138,31 @@ eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\n"), false, "no N line
   eq(M.dueForAutostart([a], { aaaaaaaa: { active: "activating", listening: false } }, true, {}), [], "already connecting: leave it");
   eq(M.dueForAutostart([a], { aaaaaaaa: { active: "failed", listening: false } }, true, {}), [], "failed (gave up): do not loop");
   eq(M.dueForAutostart([a], { aaaaaaaa: { active: "inactive", listening: true } }, true, {}), [], "port taken by another program: do not start");
+}
+
+// autostart retries: only for "server unreachable" failures, with a growing wait, a few times
+{
+  const a = { id: "aaaaaaaa", autostart: true }, b = { id: "bbbbbbbb", autostart: true, askPassword: true };
+  const fail = (reason) => ({ aaaaaaaa: { active: "failed", listening: false, reason } });
+  const T0 = 1000000;
+  const r = (n, at) => ({ aaaaaaaa: { n, at } });
+  eq(M.retryDue([a], fail("ssh: connect to host x port 22: Connection timed out"), true, r(0, T0), T0 + 29000), "", "first retry waits 30 s");
+  eq(M.retryDue([a], fail("ssh: connect to host x port 22: Connection timed out"), true, r(0, T0), T0 + 30000), "aaaaaaaa", "retry after 30 s");
+  eq(M.retryDue([a], fail("Could not resolve hostname x"), true, r(0, T0), T0 + 30000), "aaaaaaaa", "name not resolved yet: retry");
+  eq(M.retryDue([a], fail("No route to host"), true, r(1, T0), T0 + 59000), "", "second wait is 60 s");
+  eq(M.retryDue([a], fail("No route to host"), true, r(1, T0), T0 + 60000), "aaaaaaaa", "second retry after 60 s");
+  eq(M.retryDue([a], fail("No route to host"), true, r(4, T0), T0 + 480000), "aaaaaaaa", "fifth retry after 8 min");
+  eq(M.retryDue([a], fail("No route to host"), true, r(5, T0), T0 + 99999999), "", "gives up after five retries");
+  eq(M.retryDue([a], fail("Permission denied (publickey)."), true, r(0, T0), T0 + 99999999), "", "wrong key: never retried");
+  eq(M.retryDue([a], fail("Host key verification failed."), true, r(0, T0), T0 + 99999999), "", "host key: never retried");
+  eq(M.retryDue([a], fail("bind: Address already in use"), true, r(0, T0), T0 + 99999999), "", "port busy: never retried");
+  eq(M.retryDue([a], fail("No route to host"), false, r(0, T0), T0 + 99999999), "", "offline: wait for the network");
+  eq(M.retryDue([a], fail("No route to host"), true, {}, T0 + 99999999), "", "not started by autostart: never retried");
+  eq(M.retryDue([a], { aaaaaaaa: { active: "inactive", listening: false } }, true, r(0, T0), T0 + 99999999), "", "stopped: not retried");
+  eq(M.retryDue([a], { aaaaaaaa: { active: "activating", listening: false } }, true, r(0, T0), T0 + 99999999), "", "still connecting: not retried");
+  eq(M.retryDue([a], {}, true, r(0, T0), T0 + 99999999), "", "no poll yet");
+  eq(M.retryDue([b], { bbbbbbbb: { active: "failed", reason: "No route to host" } }, true, { bbbbbbbb: { n: 0, at: T0 } }, T0 + 99999999), "", "ask-password tunnels never retry by themselves");
+  eq(M.retryDue([{ id: "aaaaaaaa", autostart: false }], fail("No route to host"), true, r(0, T0), T0 + 99999999), "", "autostart switched off meanwhile: no retry");
 }
 
 // a tunnel that was running when the session started must stay stopped once it is stopped

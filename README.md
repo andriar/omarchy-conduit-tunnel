@@ -32,7 +32,8 @@ The screenshots use made-up names and addresses.
 - **Copy the address** (`127.0.0.1:<port>`) with one click once it is up.
 - **Failures say why**: host key not trusted yet, login refused, name does not resolve, server unreachable, local port in use.
 - **Drop notification** when a tunnel that was up goes away by itself. A tunnel you stop yourself stays quiet.
-- **Safe by default**: listens on `127.0.0.1` only, never prompts (so it cannot hang), and gives up after five failed restarts in two minutes instead of looping forever.
+- **Ask for password** (optional, per tunnel): for a server that only takes a password. A dialog asks each time you start the tunnel, and the password goes straight to `ssh`. Nothing is stored, and such a tunnel never starts or restarts by itself (see [Password tunnels](#password-tunnels)).
+- **Safe by default**: listens on `127.0.0.1` only, never prompts unless you turned on *Ask for password* (so it cannot hang), and gives up after five failed restarts in two minutes instead of looping forever.
 - Works with your `~/.ssh/config`: the SSH server can be a `Host` alias, so `ProxyJump`, `IdentityFile` and friends apply.
 
 ## Requirements
@@ -41,6 +42,7 @@ The screenshots use made-up names and addresses.
 - The OpenSSH client (`ssh`).
 - A key that works without a prompt: **without a passphrase**, or **loaded in an `ssh-agent`** (see [ssh-agent](#ssh-agent-keys-with-a-passphrase)). The widget runs `ssh` in batch mode, so it cannot ask for a passphrase.
 - `wl-clipboard` for the copy button (optional).
+- `zenity` for the password dialog (only if you use *Ask for password*; Omarchy ships it).
 
 ## Install
 
@@ -125,13 +127,23 @@ A key **without** a passphrase needs nothing here. A key **with** a passphrase h
 
 You do **not** have to restart anything for Conduit: when the shell has no `SSH_AUTH_SOCK`, tunnels look for the agent at `$XDG_RUNTIME_DIR/ssh-agent.socket` (and the GNOME keyring and gcr sockets) by themselves. Only your terminals need step 2. The agent forgets your key when you log out or reboot, so run `ssh-add` again after that.
 
+## Password tunnels
+
+Most bastions take a key, and a key is the better choice: it needs no dialog and the tunnel can start by itself. Some only take a password, or you have not registered your key yet. For those, turn on **Ask for password** in the tunnel's edit form.
+
+- Each time you start the tunnel, a small dialog asks for the password and hands it straight to `ssh` (through `SSH_ASKPASS`). It is never written to a file, a log or `tunnels.json`.
+- The dialog only answers password, passphrase and one-time-code prompts. A **host key question is always refused**, so an unknown host still fails with "host key not trusted yet" and you accept it once in a terminal, as usual.
+- `ssh` gets **one** password attempt per start. The tunnel is **not restarted by itself**: a retry loop would pop the dialog up again and again, and a wrong password could lock your account on the server. If the connection drops you get the usual notification, and you start it again from the list.
+- It never starts automatically (the *Start automatically* switch is hidden for these tunnels): a dialog out of nowhere at login would be a surprise.
+- Cancel the dialog, or wait two minutes, and the start fails with "Login refused".
+
 ## Security and privacy
 
-- **No secrets are stored.** There are no passwords: authentication is your SSH key.
+- **No secrets are stored.** Authentication is your SSH key. A tunnel with *Ask for password* asks you in a dialog each time; the password goes to `ssh` and nowhere else.
 - Tunnels are saved in `~/.config/omarchy-conduit-tunnel/tunnels.json`, readable only by you (`0600`). It holds hostnames, so it is never part of this repository, and `.gitignore` and `scripts/check.sh` keep it out.
 - Tunnels listen on **`127.0.0.1` only**, never on `0.0.0.0`.
 - Every value you type is validated against a strict pattern, both in the popup and again in the shell script, before it reaches an `ssh` command line. A server name that starts with `-` or contains spaces or shell characters is rejected.
-- Host keys are checked as usual (`StrictHostKeyChecking` is not weakened) and `BatchMode` is on, so nothing waits for a prompt nobody can answer.
+- Host keys are checked as usual (`StrictHostKeyChecking` is not weakened; the password dialog refuses host key questions) and `BatchMode` is on, so nothing waits for a prompt nobody can answer. The one exception is a tunnel with *Ask for password*, which turns `BatchMode` off for that tunnel and answers only through the dialog.
 - The widget makes **no network requests** of its own beyond the `ssh` connections you configure.
 - Omarchy shell plugins run **unsandboxed**. Read the code before you install any plugin, including this one.
 - Do not post your `tunnels.json`, `~/.ssh/config` or logs in issues: they contain your real hostnames.
@@ -141,7 +153,7 @@ You do **not** have to restart anything for Conduit: when the shell has no `SSH_
 | What the row says | Likely cause |
 |---|---|
 | "The server's host key is not trusted yet" | First connection to that server. Run `ssh user@host` once in a terminal and accept the key. |
-| "Login refused" | Your key is not accepted, or it has a passphrase and no `ssh-agent` holds it (see [ssh-agent](#ssh-agent-keys-with-a-passphrase)). Try `ssh user@host` in a terminal. |
+| "Login refused" | Your key is not accepted, or it has a passphrase and no `ssh-agent` holds it (see [ssh-agent](#ssh-agent-keys-with-a-passphrase)). On a password tunnel: the password was wrong or the dialog was cancelled. Try `ssh user@host` in a terminal. |
 | "Cannot resolve the server name" | A typo in the SSH server, or no DNS or network. |
 | "Cannot reach the server" | The SSH server is down, firewalled, or on another port (set it in `~/.ssh/config`). |
 | "The local port is already in use" / "Port N is already in use by another program" | Pick another local port, or stop the program using it (`ss -ltnp 'sport = :5432'`). |

@@ -18,7 +18,7 @@
   "time.hoursMinutes": "%1 h %2 m",
   "time.daysHours": "%1 d %2 h",
   "reason.hostKey": "The server's host key is not trusted yet. Connect once in a terminal (ssh %1) to accept it.",
-  "reason.auth": "Login refused. Check your SSH key and that ssh-agent has it loaded.",
+  "reason.auth": "Login refused. Check your SSH key and that ssh-agent has it loaded, or the password you typed.",
   "reason.resolve": "Cannot resolve the server name.",
   "reason.unreachable": "Cannot reach the server (refused or timed out).",
   "reason.portBusy": "The local port is already in use.",
@@ -50,6 +50,9 @@
   "notice.dropped": "%1 dropped. %2",
   "notice.startFailed": "Could not change tunnel %1: %2",
   "notice.saveFailed": "Could not save the tunnel list",
+  "form.pw.title": "Ask for password",
+  "form.pw.on": "A dialog asks for the SSH password each time you start it. Nothing is stored, and it never starts or restarts by itself.",
+  "form.pw.off": "Log in with your SSH key.",
   "form.auto.title": "Start automatically",
   "form.auto.on": "Starts when the shell starts and the network is up.",
   "form.auto.off": "Start it manually."

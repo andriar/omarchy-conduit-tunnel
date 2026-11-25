@@ -59,6 +59,7 @@ if command -v node >/dev/null; then
 else
   echo "check: node not found, skipping tests/model.test.js"
 fi
+bash tests/askpass.test.sh >/dev/null || fail "tests/askpass.test.sh failed (run it to see why)"
 
 # Secret / profile scan.
 pattern='BEGIN (RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY|BEGIN CERTIFICATE|IdentityFile +[^ ]|\.rds\.amazonaws\.com|\.internal\.[a-z]+\b'

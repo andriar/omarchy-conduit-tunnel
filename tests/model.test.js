@@ -84,10 +84,23 @@ eq(M.clean([{ ...good, autostart: true }])[0].autostart, true, "clean() keeps au
 eq(M.clean([good])[0].autostart, false, "autostart defaults to false");
 eq(M.clean([{ ...good, autostart: "true" }])[0].autostart, false, 'autostart "true" (a string) is not true');
 
+// askPassword flag: same strictness as autostart
+eq(M.clean([{ ...good, askPassword: true }])[0].askPassword, true, "clean() keeps askPassword: true");
+eq(M.clean([good])[0].askPassword, false, "askPassword defaults to false");
+eq(M.clean([{ ...good, askPassword: "true" }])[0].askPassword, false, 'askPassword "true" (a string) is not true');
+eq(M.clean([{ ...good, askPassword: 1 }])[0].askPassword, false, "askPassword 1 is not true");
+
 // the online line of the status script
 eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\nN\t1\n"), true, "online = 1");
 eq(M.parseOnline("N\t0\n"), false, "online = 0");
 eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\n"), false, "no N line means offline");
+
+// a tunnel that asks for a password never starts by itself, even if autostart is set
+{
+  const pw = { id: "dddddddd", autostart: true, askPassword: true }, key = { id: "eeeeeeee", autostart: true, askPassword: false };
+  const down = { active: "inactive", listening: false };
+  eq(M.dueForAutostart([pw, key], { dddddddd: down, eeeeeeee: down }, true, {}), ["eeeeeeee"], "askPassword tunnels are never autostarted");
+}
 
 // what to start automatically
 {

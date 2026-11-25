@@ -43,7 +43,8 @@ function clean(raw) {
       localPort: Number(r.localPort),
       remoteHost: String(r.remoteHost === undefined ? "" : r.remoteHost),
       remotePort: Number(r.remotePort),
-      autostart: r.autostart === true
+      autostart: r.autostart === true,
+      askPassword: r.askPassword === true
     }
     if (!/^[0-9a-f]{8}$/.test(t.id)) continue
     if (validate(t, []) !== "") continue
@@ -79,13 +80,15 @@ function parseOnline(text) {
 
 // Tunnels to start now: marked "start automatically", not running, polled at least once,
 // the network is up, and not tried yet this session (so a failing tunnel is not retried in a
-// loop, and one you stopped yourself is not started again). Returns ids, in list order.
+// loop, and one you stopped yourself is not started again). A tunnel that asks for a password
+// never starts by itself: a dialog out of nowhere at login would be a surprise.
+// Returns ids, in list order.
 function dueForAutostart(tunnels, states, online, tried) {
   var due = []
   if (!online) return due
   for (var i = 0; i < tunnels.length; i++) {
     var t = tunnels[i]
-    if (t.autostart === true && !tried[t.id] && states[t.id] !== undefined && stateOf(states[t.id]) === "down")
+    if (t.autostart === true && t.askPassword !== true && !tried[t.id] && states[t.id] !== undefined && stateOf(states[t.id]) === "down")
       due.push(t.id)
   }
   return due

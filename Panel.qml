@@ -52,6 +52,7 @@ Panel {
   property bool online: false
   property var autostartTried: ({})
   property bool autostartForm: false
+  property bool askPasswordForm: false
 
   readonly property string i18nDir: String(Qt.resolvedUrl("i18n")).replace(/^qs:\/\//, "")
   readonly property string scriptsDir: String(Qt.resolvedUrl("scripts")).replace(/^file:\/\//, "")
@@ -192,7 +193,8 @@ Panel {
     ctlProc.command = ["bash", root.scriptsDir + "/tunnel-ctl.sh", act]
     ctlProc.environment = {
       "TID": t.id, "TARGET": t.target, "LP": String(t.localPort),
-      "RH": t.remoteHost, "RP": String(t.remotePort)
+      "RH": t.remoteHost, "RP": String(t.remotePort),
+      "ASKPASS": t.askPassword === true ? "1" : ""
     }
     ctlProc.running = true
   }
@@ -230,6 +232,7 @@ Panel {
     hostFieldItem.text = t ? t.remoteHost : ""
     portFieldItem.text = t ? String(t.remotePort) : ""
     root.autostartForm = t ? t.autostart === true : false
+    root.askPasswordForm = t ? t.askPassword === true : false
     nameFieldItem.forceActiveFocus()
   }
 
@@ -257,7 +260,9 @@ Panel {
       localPort: String(localFieldItem.text).trim(),
       remoteHost: String(hostFieldItem.text).trim(),
       remotePort: String(portFieldItem.text).trim(),
-      autostart: root.autostartForm
+      askPassword: root.askPasswordForm,
+      // A tunnel that asks for a password never starts by itself.
+      autostart: root.autostartForm && !root.askPasswordForm
     }
     var key = Model.validate(candidate, root.tunnels)
     if (key !== "") {
@@ -431,7 +436,7 @@ Panel {
       var lines = []
       for (var i = 0; i < root.tunnels.length; i++) {
         var t = root.tunnels[i]
-        lines.push(t.id + "\t" + t.name + "\t" + root.stateOfId(t.id) + "\t" + Model.address(t) + "\t" + (t.autostart ? "autostart" : ""))
+        lines.push(t.id + "\t" + t.name + "\t" + root.stateOfId(t.id) + "\t" + Model.address(t) + "\t" + (t.autostart ? "autostart" : "") + "\t" + (t.askPassword ? "askpass" : ""))
       }
       return lines.join("\n")
     }
@@ -858,6 +863,20 @@ Panel {
 
         ConduitToggleRow {
           visible: root.view === "edit"
+          width: parent.width
+          title: strings.t("form.pw.title")
+          subtitle: root.askPasswordForm ? strings.t("form.pw.on") : strings.t("form.pw.off")
+          checked: root.askPasswordForm
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          onToggled: {
+            root.askPasswordForm = !root.askPasswordForm
+            if (root.askPasswordForm) root.autostartForm = false
+          }
+        }
+
+        ConduitToggleRow {
+          visible: root.view === "edit" && !root.askPasswordForm
           width: parent.width
           title: strings.t("form.auto.title")
           subtitle: root.autostartForm ? strings.t("form.auto.on") : strings.t("form.auto.off")

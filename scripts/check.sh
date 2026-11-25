@@ -63,7 +63,7 @@ fi
 # Secret / profile scan.
 pattern='BEGIN (RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY|BEGIN CERTIFICATE|IdentityFile +[^ ]|\.rds\.amazonaws\.com|\.internal\.[a-z]+\b'
 if git ls-files --cached --others --exclude-standard -z | xargs -0 grep -I -n -E -e "$pattern" -- 2>/dev/null \
-    | grep -v -E '^(scripts/check\.sh|README\.md|CONTRIBUTING\.md|i18n/[a-z-]+\.json|tests/model\.test\.js|Panel\.qml):'; then
+    | grep -v -E '^(scripts/check\.sh|README\.md|CONTRIBUTING\.md|i18n/[a-z-]+\.json|tests/model\.test\.js|tests/e2e-real-ssh\.sh|Panel\.qml):'; then
   fail "found text that looks like a private key or a real host"
 fi
 if git ls-files --cached --others --exclude-standard | grep -E '(^|/)tunnels\.json$|\.(pem|key|crt|p12)$'; then

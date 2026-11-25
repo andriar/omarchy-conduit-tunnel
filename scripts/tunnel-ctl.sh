@@ -20,6 +20,25 @@ stop_unit() {
   return 0
 }
 
+# Where is the user's ssh-agent? The shell's own SSH_AUTH_SOCK wins; if the shell was
+# started without one, look in the usual places (the systemd ssh-agent.socket, GNOME's
+# gcr and keyring agents). CONDUIT_AGENT_DIR replaces $XDG_RUNTIME_DIR (used by the tests).
+find_agent_socket() {
+  if [[ -n ${SSH_AUTH_SOCK:-} && -S $SSH_AUTH_SOCK ]]; then
+    echo "$SSH_AUTH_SOCK"
+    return 0
+  fi
+  local dir="${CONDUIT_AGENT_DIR:-${XDG_RUNTIME_DIR:-}}" sock
+  [[ -n $dir ]] || return 1
+  for sock in "$dir/ssh-agent.socket" "$dir/gcr/ssh" "$dir/keyring/ssh"; do
+    if [[ -S $sock ]]; then
+      echo "$sock"
+      return 0
+    fi
+  done
+  return 1
+}
+
 start_unit() {
   local target="${TARGET:-}" lp="${LP:-}" rh="${RH:-}" rp="${RP:-}"
   # Validate again here: this script is the last line of defence before ssh runs.
@@ -31,7 +50,8 @@ start_unit() {
   stop_unit
   local env_args=()
   # ssh-agent: the user manager does not always know the session's agent socket.
-  [[ -n ${SSH_AUTH_SOCK:-} ]] && env_args+=("--setenv=SSH_AUTH_SOCK=$SSH_AUTH_SOCK")
+  local agent
+  if agent=$(find_agent_socket); then env_args+=("--setenv=SSH_AUTH_SOCK=$agent"); fi
 
   # Never listen beyond loopback. BatchMode: never hang on a prompt nobody can answer.
   # Restart on failure, but give up after 5 failures in 2 minutes instead of looping forever.

@@ -38,7 +38,7 @@ The screenshots use made-up names and addresses.
 
 - Omarchy with shell plugins (the `omarchy plugin` command) and a `systemd --user` session (Omarchy has both).
 - The OpenSSH client (`ssh`).
-- A key that works without a prompt: loaded in `ssh-agent`, or without a passphrase. The widget runs `ssh` in batch mode.
+- A key that works without a prompt: **without a passphrase**, or **loaded in an `ssh-agent`** (see [ssh-agent](#ssh-agent-keys-with-a-passphrase)). The widget runs `ssh` in batch mode, so it cannot ask for a passphrase.
 - `wl-clipboard` for the copy button (optional).
 
 ## Install
@@ -94,6 +94,36 @@ systemctl --user status conduit-tunnel-<id>
 journalctl --user -u conduit-tunnel-<id>
 ```
 
+## ssh-agent (keys with a passphrase)
+
+A key **without** a passphrase needs nothing here. A key **with** a passphrase has to be unlocked once per login and held by an `ssh-agent`, because the widget cannot type a passphrase for you.
+
+1. **Start the agent.** Omarchy ships OpenSSH's socket-activated user service:
+
+   ```bash
+   systemctl --user enable --now ssh-agent.socket
+   ```
+
+   Its socket is `$XDG_RUNTIME_DIR/ssh-agent.socket`.
+
+2. **Let your terminals find it.** Add this line to `~/.bashrc`, then open a new terminal:
+
+   ```bash
+   export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
+   ```
+
+3. **Load your key** (it asks for the passphrase once per login):
+
+   ```bash
+   ssh-add
+   ```
+
+   Or put `AddKeysToAgent yes` in `~/.ssh/config`, and the first `ssh` you run loads the key for you.
+
+4. **Check it:** `ssh-add -l` lists the key.
+
+You do **not** have to restart anything for Conduit: when the shell has no `SSH_AUTH_SOCK`, tunnels look for the agent at `$XDG_RUNTIME_DIR/ssh-agent.socket` (and the GNOME keyring and gcr sockets) by themselves. Only your terminals need step 2. The agent forgets your key when you log out or reboot, so run `ssh-add` again after that.
+
 ## Security and privacy
 
 - **No secrets are stored.** There are no passwords: authentication is your SSH key.
@@ -110,7 +140,7 @@ journalctl --user -u conduit-tunnel-<id>
 | What the row says | Likely cause |
 |---|---|
 | "The server's host key is not trusted yet" | First connection to that server. Run `ssh user@host` once in a terminal and accept the key. |
-| "Login refused" | Your key is not accepted, or `ssh-agent` does not have it loaded. Try `ssh user@host` in a terminal. |
+| "Login refused" | Your key is not accepted, or it has a passphrase and no `ssh-agent` holds it (see [ssh-agent](#ssh-agent-keys-with-a-passphrase)). Try `ssh user@host` in a terminal. |
 | "Cannot resolve the server name" | A typo in the SSH server, or no DNS or network. |
 | "Cannot reach the server" | The SSH server is down, firewalled, or on another port (set it in `~/.ssh/config`). |
 | "The local port is already in use" / "Port N is already in use by another program" | Pick another local port, or stop the program using it (`ss -ltnp 'sport = :5432'`). |
@@ -138,4 +168,4 @@ journalctl --user -u conduit-tunnel-<id>
 omarchy plugin add https://github.com/andriar/omarchy-conduit-tunnel.git --enable
 ```
 
-Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan, lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Tampilan mengikuti bahasa Omarchy (Setup > Language).
+Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan, lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Kalau kunci SSH-mu memakai passphrase, nyalakan agent dengan `systemctl --user enable --now ssh-agent.socket`, tambahkan `export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"` ke `~/.bashrc`, lalu jalankan `ssh-add` sekali setiap login (langkah lengkap di bagian ssh-agent). Tampilan mengikuti bahasa Omarchy (Setup > Language).

@@ -1,0 +1,12 @@
+# Keeps the GitHub Actions used by CI current (the "Node.js 20 is deprecated" warning came from
+# an old actions/checkout). One grouped pull request a month at most.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    open-pull-requests-limit: 1

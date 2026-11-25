@@ -62,8 +62,8 @@ start_unit() {
   # Validate again here: this script is the last line of defence before ssh runs.
   [[ $target =~ ^[A-Za-z0-9._][A-Za-z0-9._:-]*(@[A-Za-z0-9._:-]+)?$ ]] || fail "invalid SSH server"
   [[ $rh =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid remote host"
-  if ! [[ $lp =~ ^[0-9]+$ ]] || (( lp < 1024 || lp > 65535 )); then fail "invalid local port"; fi
-  if ! [[ $rp =~ ^[0-9]+$ ]] || (( rp < 1 || rp > 65535 )); then fail "invalid remote port"; fi
+  if ! [[ $lp =~ ^[0-9]+$ ]] || (( 10#$lp < 1024 || 10#$lp > 65535 )); then fail "invalid local port"; fi
+  if ! [[ $rp =~ ^[0-9]+$ ]] || (( 10#$rp < 1 || 10#$rp > 65535 )); then fail "invalid remote port"; fi
 
   stop_unit
   local env_args=()
@@ -103,7 +103,10 @@ start_unit() {
 }
 
 case "$act" in
-  start) start_unit ;;
+  start)
+    # Starting what already runs must not cut its live connections. "restart" is the way to redo it.
+    if systemctl --user is-active --quiet "$unit.service" 2>/dev/null; then echo "already running"; exit 0; fi
+    start_unit ;;
   stop) stop_unit ;;
   restart) start_unit ;;
   *) fail "usage: tunnel-ctl.sh start|stop|restart" ;;

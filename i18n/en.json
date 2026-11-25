@@ -66,5 +66,6 @@
   "paste.err.command": "There is something after the host. Paste only the ssh -L part.",
   "paste.err.noHost": "No SSH server found in the command.",
   "paste.err.noForward": "No -L forward found in the command.",
-  "paste.err.forward": "Cannot read the forward \"%1\". It should look like [bind:]port:host:port."
+  "paste.err.forward": "Cannot read the forward \"%1\". It should look like [bind:]port:host:port.",
+  "notice.loadRepaired": "Your tunnel list could not be read completely. A copy of the file was kept next to it as tunnels.json.bak.<time>."
 }

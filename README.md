@@ -34,7 +34,7 @@ The screenshots use made-up names and addresses.
 - **Failures say why**: host key not trusted yet, login refused, name does not resolve, server unreachable, local port in use.
 - **Drop notification** when a tunnel that was up goes away by itself. A tunnel you stop yourself stays quiet.
 - **Ask for password** (optional, per tunnel): for a server that only takes a password. A dialog asks each time you start the tunnel, and the password goes straight to `ssh`. Nothing is stored, and such a tunnel never starts or restarts by itself (see [Password tunnels](#password-tunnels)).
-- **Safe by default**: listens on `127.0.0.1` only, never prompts unless you turned on *Ask for password* (so it cannot hang), and gives up after five failed restarts in two minutes instead of looping forever.
+- **Safe by default**: listens on `127.0.0.1` only, never prompts unless you turned on *Ask for password* (so it cannot hang), and gives up after five starts within two minutes instead of looping forever.
 - Works with your `~/.ssh/config`: the SSH server can be a `Host` alias, so `ProxyJump`, `IdentityFile` and friends apply.
 
 ## Requirements
@@ -85,8 +85,8 @@ omarchy plugin enable conduit.tunnel
 ### From the command line
 
 ```bash
-omarchy-shell conduit.tunnel status                 # id, name, state, address
-omarchy-shell conduit.tunnel start "Staging database"
+omarchy-shell conduit.tunnel status                 # id, name, state, address, autostart, askpass (tab separated)
+omarchy-shell conduit.tunnel start "Staging database"   # does nothing if it already runs
 omarchy-shell conduit.tunnel stop  "Staging database"
 omarchy-shell conduit.tunnel toggle                 # open or close the popup
 ```
@@ -159,7 +159,8 @@ Most bastions take a key, and a key is the better choice: it needs no dialog and
 
 - **No secrets are stored.** Authentication is your SSH key. A tunnel with *Ask for password* asks you in a dialog each time; the password goes to `ssh` and nowhere else.
 - Tunnels are saved in `~/.config/omarchy-conduit-tunnel/tunnels.json`, readable only by you (`0600`). It holds hostnames, so it is never part of this repository, and `.gitignore` and `scripts/check.sh` keep it out.
-- Tunnels listen on **`127.0.0.1` only**, never on `0.0.0.0`.
+- Tunnels listen on **`127.0.0.1` only**, never on `0.0.0.0`. That covers the forward Conduit builds itself. If the server name is a `Host` alias from `~/.ssh/config`, any `LocalForward` or `DynamicForward` set there on that alias still applies and is not controlled by Conduit. `ControlMaster` and `ControlPath` are switched off for these connections, so SSH connection sharing from your config is not used.
+- If `tunnels.json` cannot be read completely (for example after a hand edit left a stray comma), the file is copied to `tunnels.json.bak.<time>` before anything can overwrite it, and you get a notification.
 - Every value you type is validated against a strict pattern, both in the popup and again in the shell script, before it reaches an `ssh` command line. A server name that starts with `-` or contains spaces or shell characters is rejected.
 - Host keys are checked as usual (`StrictHostKeyChecking` is not weakened; the password dialog refuses host key questions) and `BatchMode` is on, so nothing waits for a prompt nobody can answer. The one exception is a tunnel with *Ask for password*, which turns `BatchMode` off for that tunnel and answers only through the dialog.
 - The widget makes **no network requests** of its own beyond the `ssh` connections you configure.

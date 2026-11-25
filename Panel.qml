@@ -176,6 +176,8 @@ Panel {
     root.states = Model.parsePoll(text)
     root.online = Model.parseOnline(text)
     root.nowMs = Date.now()
+    var handled = Model.handledThisSession(root.tunnels, root.states)
+    for (var h = 0; h < handled.length; h++) root.autostartTried[handled[h]] = true
     var dropped = Model.detectDrops(root.tunnels, root.states, root.prevState, root.manualStop, root.busyId)
     for (var i = 0; i < dropped.length; i++) {
       var t = root.tunnelById(dropped[i])
@@ -188,7 +190,9 @@ Panel {
   // ---- start / stop --------------------------------------------------------
 
   function runCtl(act, t) {
-    if (ctlProc.running || !t) return
+    if (ctlProc.running || !t) return false
+    // Whatever the user (or IPC) does with a tunnel, autostart has no say in it any more this session.
+    root.autostartTried[t.id] = true
     root.busyId = t.id
     setStatus("", false)
     root.manualStop[t.id] = act === "stop"
@@ -199,6 +203,7 @@ Panel {
       "ASKPASS": t.askPassword === true ? "1" : ""
     }
     ctlProc.running = true
+    return true
   }
 
   function toggleTunnel(t) {
@@ -354,12 +359,33 @@ Panel {
     stdout: StdioCollector {
       onStreamFinished: {
         var raw = []
-        try { raw = JSON.parse(String(text) || "[]") } catch (e) { raw = [] }
+        var unreadable = false
+        var body = String(text).trim()
+        if (body !== "") {
+          try { raw = JSON.parse(body) } catch (e) { raw = []; unreadable = true }
+        }
         root.tunnels = Model.clean(raw)
+        // A file that does not parse, or entries that did not validate, would be lost for good
+        // by the next save. Keep a copy first and say so.
+        var lost = unreadable || (Array.isArray(raw) && raw.length > root.tunnels.length) || (body !== "" && !Array.isArray(raw))
+        if (lost) {
+          backupProc.running = true
+          Quickshell.execDetached(["notify-send", "-u", "critical", "Conduit",
+            strings.t("notice.loadRepaired")])
+        }
         root.loaded = true
         root.refresh()
       }
     }
+  }
+
+  Process {
+    id: backupProc
+    command: [
+      "bash", "-c",
+      "umask 077; d=\"${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-conduit-tunnel\"; " +
+      "cp \"$d/tunnels.json\" \"$d/tunnels.json.bak.$(date +%s)\" 2>/dev/null; true"
+    ]
   }
 
   Process {
@@ -451,14 +477,15 @@ Panel {
     function start(key: string): string {
       var t = root.findTunnel(key)
       if (!t) return "unknown tunnel: " + key
-      root.runCtl("start", t)
+      if (Model.isRunning(root.stateOfId(t.id))) return "already running: " + t.name
+      if (!root.runCtl("start", t)) return "busy, try again"
       return "starting " + t.name
     }
 
     function stop(key: string): string {
       var t = root.findTunnel(key)
       if (!t) return "unknown tunnel: " + key
-      root.runCtl("stop", t)
+      if (!root.runCtl("stop", t)) return "busy, try again"
       return "stopping " + t.name
     }
 

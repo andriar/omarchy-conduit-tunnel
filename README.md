@@ -28,6 +28,7 @@ The screenshots use made-up names and addresses.
 - **One list of tunnels** with live status: `Connected · 127.0.0.1:5432 · 11 min`.
 - **Start and stop** with a switch, or from the command line and keybindings (see below).
 - **Add, edit and delete** tunnels in the popup: a name, the SSH server, a local port, and the remote host and port.
+- **Paste an ssh command**: paste a whole `ssh -L 5433:db.example:5432 user@bastion` line into the *SSH server* field and every field fills itself in (see [Pasting an ssh command](#pasting-an-ssh-command)).
 - **Start automatically**: mark the tunnels you always need. They start when the shell starts and the network is up, once per session, so a tunnel that fails is not retried in a loop and one you stopped yourself stays stopped.
 - **Copy the address** (`127.0.0.1:<port>`) with one click once it is up.
 - **Failures say why**: host key not trusted yet, login refused, name does not resolve, server unreachable, local port in use.
@@ -127,6 +128,23 @@ A key **without** a passphrase needs nothing here. A key **with** a passphrase h
 
 You do **not** have to restart anything for Conduit: when the shell has no `SSH_AUTH_SOCK`, tunnels look for the agent at `$XDG_RUNTIME_DIR/ssh-agent.socket` (and the GNOME keyring and gcr sockets) by themselves. Only your terminals need step 2. The agent forgets your key when you log out or reboot, so run `ssh-add` again after that.
 
+## Pasting an ssh command
+
+Already have the command in a chat, a doc or your shell history? Paste the whole line into the **SSH server** field:
+
+```
+ssh -L 0.0.0.0:5433:db.example:5432 -p 22 user@bastion.example.com
+```
+
+The server, local port, remote host and remote port are filled in, and the name is suggested from the remote host if it is empty. Check the fields and save.
+
+- **The pasted text is only read.** It is never run and never reaches a shell. Each field still goes through the same strict checks as when you type it.
+- **Refused, by name, when it cannot be honoured:** `-o`, `-J`, `-i`, `-F`, `-R`, `-D`, `-W`, a remote command after the host, an SSH port other than 22, and anything with `;`, `|`, `&`, `$`, backticks or an open quote. Put what you need (a port, a jump host, a key) in `~/.ssh/config` and use that `Host` as the server.
+- A wider **bind address** (`0.0.0.0`, `*`) is not carried over: tunnels listen on `127.0.0.1` only, and the form says so.
+- With **several `-L`**, the first is taken and you are told. One tunnel is one forward.
+- Flags that change nothing here (`-N`, `-f`, `-q`, `-v`, `-4`, `-6`, `-C`, `-T`, `-n`, `-x`, `-g`) are ignored. A leading `$ ` from a copied prompt is fine.
+- Paste it on **one line**: the field is a single line.
+
 ## Password tunnels
 
 Most bastions take a key, and a key is the better choice: it needs no dialog and the tunnel can start by itself. Some only take a password, or you have not registered your key yet. For those, turn on **Ask for password** in the tunnel's edit form.
@@ -181,4 +199,4 @@ Most bastions take a key, and a key is the better choice: it needs no dialog and
 omarchy plugin add https://github.com/andriar/omarchy-conduit-tunnel.git --enable
 ```
 
-Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan, lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Nyalakan **Start automatically** di pengaturan tunnel supaya menyala sendiri saat shell mulai dan jaringan aktif. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Kalau kunci SSH-mu memakai passphrase, nyalakan agent dengan `systemctl --user enable --now ssh-agent.socket`, tambahkan `export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"` ke `~/.bashrc`, lalu jalankan `ssh-add` sekali setiap login (langkah lengkap di bagian ssh-agent). Tampilan mengikuti bahasa Omarchy (Setup > Language).
+Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan (atau tempel perintah `ssh -L …` lengkap di kolom server, semua kolom terisi sendiri), lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Nyalakan **Start automatically** di pengaturan tunnel supaya menyala sendiri saat shell mulai dan jaringan aktif. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Kalau kunci SSH-mu memakai passphrase, nyalakan agent dengan `systemctl --user enable --now ssh-agent.socket`, tambahkan `export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"` ke `~/.bashrc`, lalu jalankan `ssh-add` sekali setiap login (langkah lengkap di bagian ssh-agent). Tampilan mengikuti bahasa Omarchy (Setup > Language).

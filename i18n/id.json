@@ -27,7 +27,7 @@
   "form.name": "Nama",
   "form.namePlaceholder": "Database staging",
   "form.server": "Server SSH",
-  "form.serverPlaceholder": "user@bastion.example.com",
+  "form.serverPlaceholder": "user@bastion.example.com, atau tempel perintah ssh -L",
   "form.localPort": "Port lokal",
   "form.remoteHost": "Host tujuan",
   "form.remoteHostPlaceholder": "db.internal.example",
@@ -55,5 +55,16 @@
   "form.pw.off": "Masuk dengan kunci SSH.",
   "form.auto.title": "Mulai otomatis",
   "form.auto.on": "Mulai saat shell menyala dan jaringan sudah aktif.",
-  "form.auto.off": "Mulai secara manual."
+  "form.auto.off": "Mulai secara manual.",
+  "paste.ok": "Terisi dari perintah ssh. Periksa dulu, lalu simpan.",
+  "paste.note.bind": "Hanya mendengarkan di 127.0.0.1: alamat bind yang lebih luas tidak dipakai.",
+  "paste.note.more": "Hanya -L pertama yang diambil: satu tunnel berarti satu forward.",
+  "paste.err.unsafe": "Tempel satu perintah ssh saja, tanpa ; | & $ atau backtick.",
+  "paste.err.notSsh": "Itu tidak terlihat seperti perintah ssh.",
+  "paste.err.option": "Opsi %1 tidak bisa dipakai di sini. Taruh di ~/.ssh/config lalu pakai Host itu sebagai server SSH.",
+  "paste.err.port": "Port SSH %1 belum didukung di sini. Taruh di ~/.ssh/config lalu pakai Host itu sebagai server SSH.",
+  "paste.err.command": "Ada sesuatu setelah host. Tempel bagian ssh -L saja.",
+  "paste.err.noHost": "Server SSH tidak ditemukan di perintah itu.",
+  "paste.err.noForward": "Tidak ada forward -L di perintah itu.",
+  "paste.err.forward": "Forward \"%1\" tidak bisa dibaca. Bentuknya harus [bind:]port:host:port."
 }

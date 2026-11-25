@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "conduit.tunnel",
   "name": "Conduit Tunnel",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "andriar",
   "license": "MIT",
   "description": "SSH tunnel manager for the Omarchy bar: start and stop port forwards to databases and other private services, with status, reasons for failures, and drop notifications.",

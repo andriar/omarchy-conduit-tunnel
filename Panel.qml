@@ -585,6 +585,20 @@ Panel {
         // Shared horizontal inset so the title, rows and buttons line up.
         property int inset: Style.space(10)
 
+        // A short fade when the view changes (list <-> add/edit), so the swap is not a hard cut.
+        Connections {
+          target: root
+          function onViewChanged() { viewFade.restart() }
+        }
+        NumberAnimation {
+          id: viewFade
+          target: column
+          property: "opacity"
+          from: 0; to: 1
+          duration: Style.duration(160)
+          easing.type: Easing.OutCubic
+        }
+
         // ================= list view =================
 
         Item {
@@ -619,7 +633,10 @@ Panel {
         }
 
         Text {
+          id: statusMessage
           visible: root.view === "list" && root.statusText !== ""
+          onTextChanged: if (text !== "") statusFade.restart()
+          NumberAnimation { id: statusFade; target: statusMessage; property: "opacity"; from: 0; to: 1; duration: Style.duration(160); easing.type: Easing.OutCubic }
           textFormat: Text.PlainText
           width: parent.width
           leftPadding: column.inset
@@ -668,11 +685,13 @@ Panel {
                 ? Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.12)
                 : (rowMouse.containsMouse
                     ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.07)
-                    : "transparent")
+                    : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0))
+              Behavior on color { ColorAnimation { duration: Style.duration(120) } }
 
               // An up tunnel carries an accent bar on the left edge.
               Rectangle {
-                visible: row.isUp
+                opacity: row.isUp ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Style.duration(150); easing.type: Easing.OutCubic } }
                 width: Style.space(3)
                 height: parent.height
                 radius: width / 2
@@ -711,6 +730,7 @@ Panel {
                   elide: Text.ElideRight
                   text: root.subtitleOf(row.modelData)
                   color: row.isUp ? Commons.Color.accent : (root.isProblem(row.modelData) ? root.urgent : root.dim)
+                  Behavior on color { ColorAnimation { duration: Style.duration(120) } }
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.bodySmall
                 }
@@ -950,7 +970,10 @@ Panel {
         }
 
         Text {
+          id: formErrorMessage
           visible: root.view === "edit" && root.formError !== ""
+          onTextChanged: if (text !== "") formErrorFade.restart()
+          NumberAnimation { id: formErrorFade; target: formErrorMessage; property: "opacity"; from: 0; to: 1; duration: Style.duration(160); easing.type: Easing.OutCubic }
           textFormat: Text.PlainText
           width: parent.width
           wrapMode: Text.WordWrap

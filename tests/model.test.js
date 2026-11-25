@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8").replace(/^\.pragma library\s*$/m, "");
-const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart, parseSshCommand, looksLikeSsh, shellSplit };")();
+const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart, handledThisSession, parseSshCommand, looksLikeSsh, shellSplit };")();
 
 let pass = 0, fail = 0;
 const eq = (a, b, m) => { const ok = JSON.stringify(a) === JSON.stringify(b); ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + m + (ok ? "" : `  got ${JSON.stringify(a)} want ${JSON.stringify(b)}`)); };
@@ -115,6 +115,21 @@ eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\n"), false, "no N line
   eq(M.dueForAutostart([a], { aaaaaaaa: { active: "activating", listening: false } }, true, {}), [], "already connecting: leave it");
   eq(M.dueForAutostart([a], { aaaaaaaa: { active: "failed", listening: false } }, true, {}), [], "failed (gave up): do not loop");
   eq(M.dueForAutostart([a], { aaaaaaaa: { active: "inactive", listening: true } }, true, {}), [], "port taken by another program: do not start");
+}
+
+// a tunnel that was running when the session started must stay stopped once it is stopped
+{
+  const a = { id: "aaaaaaaa", autostart: true }, b = { id: "bbbbbbbb", autostart: false };
+  const up = { active: "active", listening: true }, down = { active: "inactive", listening: false };
+  const tried = {};
+  // poll 1: a is already up, b is not an autostart tunnel
+  for (const id of M.handledThisSession([a, b], { aaaaaaaa: up, bbbbbbbb: up })) tried[id] = true;
+  eq(Object.keys(tried), ["aaaaaaaa"], "only autostart tunnels that are doing something are marked");
+  // poll 2: the user stopped it
+  eq(M.dueForAutostart([a, b], { aaaaaaaa: down, bbbbbbbb: down }, true, tried), [], "up, then stopped: not started again");
+  eq(M.handledThisSession([a], { aaaaaaaa: down }), [], "a down tunnel is not marked");
+  eq(M.handledThisSession([a], {}), [], "no poll yet: nothing marked");
+  eq(M.handledThisSession([a], { aaaaaaaa: { active: "failed", listening: false } }), ["aaaaaaaa"], "failed counts as handled");
 }
 
 // drop detection

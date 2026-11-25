@@ -25,7 +25,11 @@ for spec in ${SPECS:-}; do
 
   reason=""
   if [[ $active == failed || $active == activating || ( $active == active && $listening == 0 ) ]]; then
-    reason=$(journalctl --user -u "$unit" -n 30 --no-pager -o cat 2>/dev/null \
+    # Only this run's own log: an error from an earlier run must not outlive a fix.
+    inv=$(systemctl --user show "$unit" -p InvocationID --value 2>/dev/null)
+    [[ $inv =~ ^[0-9a-f]{32}$ ]] || inv=""
+    reason=""
+    [[ -n $inv ]] && reason=$(journalctl --user "_SYSTEMD_INVOCATION_ID=$inv" -n 30 --no-pager -o cat 2>/dev/null \
       | grep -E 'Permission denied|Host key verification|IDENTIFICATION HAS CHANGED|Could not resolve|Name or service not known|Connection refused|timed out|No route to host|Network is unreachable|Address already in use|Could not request local forwarding|bind' \
       | tail -1 | tr -d '\r\t' | cut -c1-200)
   fi

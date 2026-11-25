@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end test of the shell scripts against real systemd --user units, with a fake ssh.
-# Needs a systemd user session. Uses ports 45931-45937 and units conduit-tunnel-a1b2c30*.
+# Needs a systemd user session. Uses ports 45931-45938 and units conduit-tunnel-a1b2c30*.
 #   tests/e2e-local.sh
 # The predicates below are passed by name to check/poll_until, so shellcheck sees them as unused.
 # shellcheck disable=SC2329
@@ -12,7 +12,7 @@ pass=0
 fail=0
 FOREIGN_PID=""
 # Tunnel ids are 8 hex digits.
-ids=(a1b2c301 a1b2c302 a1b2c303 a1b2c304 a1b2c305 a1b2c306 a1b2c307)
+ids=(a1b2c301 a1b2c302 a1b2c303 a1b2c304 a1b2c305 a1b2c306 a1b2c307 a1b2c308)
 
 check() { # check "name" command args...
   local name=$1
@@ -132,8 +132,34 @@ ASKPASS=1 ctl "${ids[6]}" denied 45937 start
 check "askpass+denied: ends up failed" poll_until 20 is_failed "${ids[6]}" 45937
 sleep 3
 check "askpass+denied: systemd never restarted it" test "$(unit_prop "${ids[6]}" NRestarts)" = 0
-check "askpass: ASKPASS=0 means a normal tunnel" bash -c "ASKPASS=0 TID=${ids[5]} TARGET=ok LP=45936 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh start && [[ \$(systemctl --user show conduit-tunnel-${ids[5]}.service -p Restart --value) == on-failure ]]"
+check "askpass: ASKPASS=0 means a normal tunnel" bash -c "ASKPASS=0 TID=${ids[5]} TARGET=ok LP=45936 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh restart && [[ \$(systemctl --user show conduit-tunnel-${ids[5]}.service -p Restart --value) == on-failure ]]"
 ctl "${ids[5]}" ok 45936 stop
+
+# 7. "start" on a running tunnel must not cut it; "restart" does
+ctl "${ids[0]}" ok 45931 restart
+poll_until 20 is_running_and_listening "${ids[0]}" 45931
+pid_of() { systemctl --user show "conduit-tunnel-${ids[0]}.service" -p MainPID --value; }
+before=$(pid_of)
+check "start on a running tunnel says so" test "$(ctl "${ids[0]}" ok 45931 start)" = "already running"
+check "start on a running tunnel keeps the same process" test "$(pid_of)" = "$before"
+ctl "${ids[0]}" ok 45931 restart
+poll_until 20 is_running_and_listening "${ids[0]}" 45931
+check "restart replaces the process" test "$(pid_of)" != "$before"
+ctl "${ids[0]}" ok 45931 stop
+
+# 8. ports with a leading zero are refused by the script, as the form refuses them
+check "leading-zero local port is refused" bash -c "! TID=${ids[0]} TARGET=ok LP=09 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh start 2>/dev/null"
+check "leading-zero remote port is refused" bash -c "! TID=${ids[0]} TARGET=ok LP=45931 RH=db.example RP=0005432x bash scripts/tunnel-ctl.sh start 2>/dev/null"
+check "no unit was created by the refused starts" test "$(systemctl --user is-active "conduit-tunnel-${ids[0]}.service" 2>/dev/null)" != active
+
+# 9. an error from an earlier run is not shown for the next run
+ctl "${ids[7]:-a1b2c308}" denied 45938 start
+poll_until 30 reason_has "${ids[7]:-a1b2c308}" 45938 "Permission denied" || true
+check "the first run shows its error" reason_has "${ids[7]:-a1b2c308}" 45938 "Permission denied"
+ctl "${ids[7]:-a1b2c308}" slow 45938 start
+sleep 1
+check "a new run does not show the old error while it connects" test -z "$(col "${ids[7]:-a1b2c308}" 45938 8)"
+ctl "${ids[7]:-a1b2c308}" slow 45938 stop
 
 # 6. the status script ends with a network line (used to hold back "start automatically")
 check "status script ends with an N line" test "$(SPECS='' bash scripts/tunnel-status.sh | tail -1 | cut -f1)" = N

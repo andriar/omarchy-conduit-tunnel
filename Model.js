@@ -199,6 +199,19 @@ function dueForAutostart(tunnels, states, online, tried) {
   return due
 }
 
+// Autostart tunnels that are already doing something (running, connecting, failed, in the way).
+// The session has dealt with them: if one is stopped later, by hand or from outside, it must
+// stay stopped. Without this, a tunnel that was already up when the shell started could be
+// switched off and then come back on the next poll.
+function handledThisSession(tunnels, states) {
+  var ids = []
+  for (var i = 0; i < tunnels.length; i++) {
+    var t = tunnels[i]
+    if (t.autostart === true && states[t.id] !== undefined && stateOf(states[t.id]) !== "down") ids.push(t.id)
+  }
+  return ids
+}
+
 // "up" | "connecting" | "failed" | "conflict" | "down"
 function stateOf(p) {
   if (!p) return "down"

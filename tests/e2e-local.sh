@@ -113,6 +113,10 @@ check "a stale SSH_AUTH_SOCK is not passed on" test "$(agent_seen 45931)" != "$a
 ctl "${ids[0]}" ok 45931 stop
 rm -rf "$agent_tmp" "$XDG_RUNTIME_DIR"/conduit-e2e-agent-*
 
+# 5. the status script ends with a network line (used to hold back "start automatically")
+check "status script ends with an N line" test "$(SPECS= bash scripts/tunnel-status.sh | tail -1 | cut -f1)" = N
+check "N line is 0 or 1" test "$(SPECS= bash scripts/tunnel-status.sh | tail -1 | cut -f2)" -le 1
+
 echo
 echo "$pass passed, $fail failed"
 exit $(( fail > 0 ))

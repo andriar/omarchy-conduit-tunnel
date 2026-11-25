@@ -47,6 +47,12 @@ Panel {
   property var prevState: ({})
   property var manualStop: ({})
 
+  // "Start automatically": nothing starts until there is a network, and each tunnel is
+  // tried once per session.
+  property bool online: false
+  property var autostartTried: ({})
+  property bool autostartForm: false
+
   readonly property string i18nDir: String(Qt.resolvedUrl("i18n")).replace(/^qs:\/\//, "")
   readonly property string scriptsDir: String(Qt.resolvedUrl("scripts")).replace(/^file:\/\//, "")
   Commons.Translations { id: strings; directory: root.i18nDir }
@@ -154,8 +160,18 @@ Panel {
 
   property bool loaded: false
 
+  function runAutostart() {
+    if (ctlProc.running || !root.loaded || root.saving) return
+    var due = Model.dueForAutostart(root.tunnels, root.states, root.online, root.autostartTried)
+    if (due.length === 0) return
+    var t = root.tunnelById(due[0])
+    root.autostartTried[t.id] = true
+    root.runCtl("start", t)
+  }
+
   function onPolled(text) {
     root.states = Model.parsePoll(text)
+    root.online = Model.parseOnline(text)
     root.nowMs = Date.now()
     var dropped = Model.detectDrops(root.tunnels, root.states, root.prevState, root.manualStop, root.busyId)
     for (var i = 0; i < dropped.length; i++) {
@@ -163,6 +179,7 @@ Panel {
       Quickshell.execDetached(["notify-send", "-u", "critical", strings.t("notice.droppedTitle"),
         strings.t("notice.dropped").arg(t.name).arg(root.reasonText(t, root.states[t.id]))])
     }
+    root.runAutostart()
   }
 
   // ---- start / stop --------------------------------------------------------
@@ -212,6 +229,7 @@ Panel {
     localFieldItem.text = t ? String(t.localPort) : ""
     hostFieldItem.text = t ? t.remoteHost : ""
     portFieldItem.text = t ? String(t.remotePort) : ""
+    root.autostartForm = t ? t.autostart === true : false
     nameFieldItem.forceActiveFocus()
   }
 
@@ -238,7 +256,8 @@ Panel {
       target: String(serverFieldItem.text).trim(),
       localPort: String(localFieldItem.text).trim(),
       remoteHost: String(hostFieldItem.text).trim(),
-      remotePort: String(portFieldItem.text).trim()
+      remotePort: String(portFieldItem.text).trim(),
+      autostart: root.autostartForm
     }
     var key = Model.validate(candidate, root.tunnels)
     if (key !== "") {
@@ -409,7 +428,7 @@ Panel {
       var lines = []
       for (var i = 0; i < root.tunnels.length; i++) {
         var t = root.tunnels[i]
-        lines.push(t.id + "\t" + t.name + "\t" + root.stateOfId(t.id) + "\t" + Model.address(t))
+        lines.push(t.id + "\t" + t.name + "\t" + root.stateOfId(t.id) + "\t" + Model.address(t) + "\t" + (t.autostart ? "autostart" : ""))
       }
       return lines.join("\n")
     }
@@ -832,6 +851,17 @@ Panel {
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
           text: root.formError
+        }
+
+        ConduitToggleRow {
+          visible: root.view === "edit"
+          width: parent.width
+          title: strings.t("form.auto.title")
+          subtitle: root.autostartForm ? strings.t("form.auto.on") : strings.t("form.auto.off")
+          checked: root.autostartForm
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          onToggled: root.autostartForm = !root.autostartForm
         }
 
         Row {

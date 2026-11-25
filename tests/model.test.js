@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8").replace(/^\.pragma library\s*$/m, "");
-const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops };")();
+const M = new Function(src + "\nreturn { newId, validate, clean, parsePoll, stateOf, isRunning, reasonKey, uptime, address, detectDrops, parseOnline, dueForAutostart };")();
 
 let pass = 0, fail = 0;
 const eq = (a, b, m) => { const ok = JSON.stringify(a) === JSON.stringify(b); ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + m + (ok ? "" : `  got ${JSON.stringify(a)} want ${JSON.stringify(b)}`)); };
@@ -78,6 +78,31 @@ eq(M.uptime(1000 + 11 * 60, 1000), { key: "time.minutes", a: 11 }, "minutes");
 eq(M.uptime(1000 + 3 * 3600 + 5 * 60, 1000), { key: "time.hoursMinutes", a: 3, b: "05" }, "hours");
 eq(M.uptime(1000 + 50 * 3600, 1000), { key: "time.daysHours", a: 2, b: 2 }, "days");
 eq(M.address(good), "127.0.0.1:5432", "address");
+
+// autostart flag survives clean(), and only a real `true` counts
+eq(M.clean([{ ...good, autostart: true }])[0].autostart, true, "clean() keeps autostart: true");
+eq(M.clean([good])[0].autostart, false, "autostart defaults to false");
+eq(M.clean([{ ...good, autostart: "true" }])[0].autostart, false, 'autostart "true" (a string) is not true');
+
+// the online line of the status script
+eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\nN\t1\n"), true, "online = 1");
+eq(M.parseOnline("N\t0\n"), false, "online = 0");
+eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\n"), false, "no N line means offline");
+
+// what to start automatically
+{
+  const a = { id: "aaaaaaaa", autostart: true }, b = { id: "bbbbbbbb", autostart: false }, c = { id: "cccccccc", autostart: true };
+  const down = { active: "inactive", listening: false };
+  const st = { aaaaaaaa: down, bbbbbbbb: down, cccccccc: down };
+  eq(M.dueForAutostart([a, b, c], st, true, {}), ["aaaaaaaa", "cccccccc"], "autostart tunnels that are down, in list order");
+  eq(M.dueForAutostart([a, b, c], st, false, {}), [], "nothing while offline");
+  eq(M.dueForAutostart([a, b, c], {}, true, {}), [], "nothing before the first poll");
+  eq(M.dueForAutostart([a, b, c], st, true, { aaaaaaaa: true }), ["cccccccc"], "a tunnel tried this session is not tried again");
+  eq(M.dueForAutostart([a], { aaaaaaaa: { active: "active", listening: true } }, true, {}), [], "already up: leave it");
+  eq(M.dueForAutostart([a], { aaaaaaaa: { active: "activating", listening: false } }, true, {}), [], "already connecting: leave it");
+  eq(M.dueForAutostart([a], { aaaaaaaa: { active: "failed", listening: false } }, true, {}), [], "failed (gave up): do not loop");
+  eq(M.dueForAutostart([a], { aaaaaaaa: { active: "inactive", listening: true } }, true, {}), [], "port taken by another program: do not start");
+}
 
 // drop detection
 {

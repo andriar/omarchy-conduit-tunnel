@@ -2,6 +2,7 @@
 # Print one tab-separated line per tunnel:
 #   T <id> <ActiveState> <SubState> <restarts> <active-since-epoch> <listening 0|1> <last error line>
 # SPECS is "id:localport id:localport ...".
+# The last line is `N <0|1>`: whether there is a default route (a network at all).
 set -u
 
 for spec in ${SPECS:-}; do
@@ -31,3 +32,7 @@ for spec in ${SPECS:-}; do
 
   printf 'T\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "${active:-inactive}" "${sub:-dead}" "${restarts:-0}" "$enter" "$listening" "$reason"
 done
+
+online=0
+ip -o route show default 2>/dev/null | grep -q . && online=1
+printf 'N\t%s\n' "$online"

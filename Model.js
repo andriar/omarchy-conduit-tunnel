@@ -42,7 +42,8 @@ function clean(raw) {
       target: String(r.target === undefined ? "" : r.target),
       localPort: Number(r.localPort),
       remoteHost: String(r.remoteHost === undefined ? "" : r.remoteHost),
-      remotePort: Number(r.remotePort)
+      remotePort: Number(r.remotePort),
+      autostart: r.autostart === true
     }
     if (!/^[0-9a-f]{8}$/.test(t.id)) continue
     if (validate(t, []) !== "") continue
@@ -64,6 +65,30 @@ function parsePoll(text) {
     }
   }
   return states
+}
+
+// The `N <0|1>` line of tunnel-status.sh: is there a default route (a network at all)?
+function parseOnline(text) {
+  var lines = String(text).split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var f = lines[i].split("\t")
+    if (f[0] === "N") return f[1] === "1"
+  }
+  return false
+}
+
+// Tunnels to start now: marked "start automatically", not running, polled at least once,
+// the network is up, and not tried yet this session (so a failing tunnel is not retried in a
+// loop, and one you stopped yourself is not started again). Returns ids, in list order.
+function dueForAutostart(tunnels, states, online, tried) {
+  var due = []
+  if (!online) return due
+  for (var i = 0; i < tunnels.length; i++) {
+    var t = tunnels[i]
+    if (t.autostart === true && !tried[t.id] && states[t.id] !== undefined && stateOf(states[t.id]) === "down")
+      due.push(t.id)
+  }
+  return due
 }
 
 // "up" | "connecting" | "failed" | "conflict" | "down"

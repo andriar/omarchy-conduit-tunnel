@@ -28,6 +28,7 @@ The screenshots use made-up names and addresses.
 - **One list of tunnels** with live status: `Connected · 127.0.0.1:5432 · 11 min`.
 - **Start and stop** with a switch, or from the command line and keybindings (see below).
 - **Add, edit and delete** tunnels in the popup: a name, the SSH server, a local port, and the remote host and port.
+- **Start automatically**: mark the tunnels you always need. They start when the shell starts and the network is up, once per session, so a tunnel that fails is not retried in a loop and one you stopped yourself stays stopped.
 - **Copy the address** (`127.0.0.1:<port>`) with one click once it is up.
 - **Failures say why**: host key not trusted yet, login refused, name does not resolve, server unreachable, local port in use.
 - **Drop notification** when a tunnel that was up goes away by itself. A tunnel you stop yourself stays quiet.
@@ -74,7 +75,7 @@ omarchy plugin enable conduit.tunnel
 1. Click the arrows icon in the bar to open the list.
 2. **+** adds a tunnel. Fill in a name, the SSH server (`user@host` or a `Host` from `~/.ssh/config`), the local port to listen on, and the host and port to reach from the SSH server. Press **Save & Start**.
 3. The switch starts and stops a tunnel. Point your database client at `127.0.0.1:<local port>`.
-4. The gear edits or deletes a tunnel.
+4. The gear edits or deletes a tunnel, and holds the **Start automatically** switch.
 
 **First connection to a server.** The widget never accepts an unknown host key for you. If the row says the host key is not trusted, run `ssh user@host` once in a terminal, answer `yes`, and start the tunnel again.
 
@@ -145,11 +146,11 @@ You do **not** have to restart anything for Conduit: when the shell has no `SSH_
 | "Cannot reach the server" | The SSH server is down, firewalled, or on another port (set it in `~/.ssh/config`). |
 | "The local port is already in use" / "Port N is already in use by another program" | Pick another local port, or stop the program using it (`ss -ltnp 'sport = :5432'`). |
 | Connected, but the database client cannot connect | The SSH server cannot reach the remote host and port you entered. Test from the SSH server itself. |
+| A tunnel marked "Start automatically" did not start | It starts once per session, as soon as there is a network. If the SSH server is only reachable through a VPN that came up later, the first attempt fails: connect the VPN, then start the tunnel from the popup. |
 | Switch turns itself off again | After five failures in two minutes systemd stops retrying. Fix the cause shown in the row, then start it again. |
 
 ## Roadmap
 
-- Start chosen tunnels at login.
 - Import `LocalForward` entries from `~/.ssh/config`.
 
 ## Contributing
@@ -168,4 +169,4 @@ You do **not** have to restart anything for Conduit: when the shell has no `SSH_
 omarchy plugin add https://github.com/andriar/omarchy-conduit-tunnel.git --enable
 ```
 
-Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan, lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Kalau kunci SSH-mu memakai passphrase, nyalakan agent dengan `systemctl --user enable --now ssh-agent.socket`, tambahkan `export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"` ke `~/.bashrc`, lalu jalankan `ssh-add` sekali setiap login (langkah lengkap di bagian ssh-agent). Tampilan mengikuti bahasa Omarchy (Setup > Language).
+Klik ikon panah di bar, tekan **+**, isi nama, server SSH (`user@host` atau `Host` dari `~/.ssh/config`), port lokal, serta host dan port tujuan, lalu **Simpan & Mulai**. Arahkan aplikasi database ke `127.0.0.1:<port lokal>`. Nyalakan **Start automatically** di pengaturan tunnel supaya menyala sendiri saat shell mulai dan jaringan aktif. Tunnel hanya mendengarkan di `127.0.0.1`, tidak menyimpan password apa pun (autentikasi lewat kunci SSH), dan daftar tunnel hanya tersimpan di mesinmu. Kalau diminta mempercayai host key, jalankan `ssh user@host` sekali di terminal. Kalau kunci SSH-mu memakai passphrase, nyalakan agent dengan `systemctl --user enable --now ssh-agent.socket`, tambahkan `export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"` ke `~/.bashrc`, lalu jalankan `ssh-add` sekali setiap login (langkah lengkap di bagian ssh-agent). Tampilan mengikuti bahasa Omarchy (Setup > Language).

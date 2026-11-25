@@ -266,6 +266,9 @@ Panel {
     }
     candidate.localPort = Number(candidate.localPort)
     candidate.remotePort = Number(candidate.remotePort)
+    // "Start automatically" applies from the next session. Saving must not start the tunnel
+    // behind the user's back; "Save & Start" is the way to start it now.
+    root.autostartTried[candidate.id] = true
 
     var list = root.tunnels.slice()
     var found = false

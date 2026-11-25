@@ -25,8 +25,8 @@ start_unit() {
   # Validate again here: this script is the last line of defence before ssh runs.
   [[ $target =~ ^[A-Za-z0-9._][A-Za-z0-9._:-]*(@[A-Za-z0-9._:-]+)?$ ]] || fail "invalid SSH server"
   [[ $rh =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid remote host"
-  [[ $lp =~ ^[0-9]+$ ]] && (( lp >= 1024 && lp <= 65535 )) || fail "invalid local port"
-  [[ $rp =~ ^[0-9]+$ ]] && (( rp >= 1 && rp <= 65535 )) || fail "invalid remote port"
+  if ! [[ $lp =~ ^[0-9]+$ ]] || (( lp < 1024 || lp > 65535 )); then fail "invalid local port"; fi
+  if ! [[ $rp =~ ^[0-9]+$ ]] || (( rp < 1 || rp > 65535 )); then fail "invalid remote port"; fi
 
   stop_unit
   local env_args=()

@@ -158,7 +158,7 @@ Most bastions take a key, and a key is the better choice: it needs no dialog and
 | "Cannot reach the server" | The SSH server is down, firewalled, or on another port (set it in `~/.ssh/config`). |
 | "The local port is already in use" / "Port N is already in use by another program" | Pick another local port, or stop the program using it (`ss -ltnp 'sport = :5432'`). |
 | Connected, but the database client cannot connect | The SSH server cannot reach the remote host and port you entered. Test from the SSH server itself. |
-| A tunnel marked "Start automatically" did not start | It starts once per session, as soon as there is a network. If the SSH server is only reachable through a VPN that came up later, the first attempt fails: connect the VPN, then start the tunnel from the popup. |
+| A tunnel marked "Start automatically" did not start | It starts once per session, as soon as there is a network. If the SSH server was not reachable yet at that moment, the first attempt fails: start the tunnel from the popup once the server can be reached. |
 | Switch turns itself off again | After five failures in two minutes systemd stops retrying. Fix the cause shown in the row, then start it again. |
 
 ## Roadmap

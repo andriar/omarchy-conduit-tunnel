@@ -102,6 +102,29 @@ eq(M.parseOnline("T\taaaaaaaa\tactive\trunning\t0\t0\t1\t\n"), false, "no N line
   eq(M.dueForAutostart([pw, key], { dddddddd: down, eeeeeeee: down }, true, {}), ["eeeeeeee"], "askPassword tunnels are never autostarted");
 }
 
+// names, targets, ids and ports that could clash or be misread
+{
+  const ok = { id: "aaaaaaaa", name: "Staging", target: "me@host.example", localPort: 5433, remoteHost: "db.example", remotePort: 5432 };
+  eq(M.validate(ok, []), "", "baseline is valid");
+  eq(M.validate({ ...ok, name: "bad\nname" }, []), "val.name", "line break in a name");
+  eq(M.validate({ ...ok, name: "bad\tname" }, []), "val.name", "tab in a name");
+  eq(M.validate({ ...ok, name: "a\u0007b" }, []), "val.name", "control character in a name");
+  eq(M.validate({ ...ok, id: "bbbbbbbb", localPort: 5434 }, [ok]), "val.nameTaken", "a name another tunnel already has");
+  eq(M.validate({ ...ok, name: " Staging " , id: "bbbbbbbb", localPort: 5434 }, [ok]), "val.nameTaken", "...even with spaces around it");
+  eq(M.validate(ok, [ok]), "", "a tunnel does not clash with itself");
+  eq(M.validate({ ...ok, target: "me@-host" }, []), "val.target", "host after @ may not start with a dash");
+  eq(M.validate({ ...ok, target: "me@host-1.example" }, []), "", "a dash inside a host is fine");
+  eq(M.validate({ ...ok, target: "-oProxyCommand=x" }, []), "val.target", "option as a server");
+  const b = { ...ok, id: "bbbbbbbb", name: "Other", localPort: 5434 };
+  eq(M.clean([ok, { ...b, id: "aaaaaaaa" }]).length, 1, "clean keeps the first of two equal ids");
+  eq(M.clean([ok, { ...b, localPort: 5433 }]).length, 1, "clean keeps the first of two equal local ports");
+  eq(M.clean([ok, { ...b, name: "Staging" }]).length, 2, "clean keeps old files with equal names working");
+  const real = Math.random; let n = 0;
+  Math.random = () => (n++ < 8 ? 0 : 0.5);
+  eq(M.newId(["00000000"]), "88888888", "newId skips an id already taken");
+  Math.random = real;
+}
+
 // what to start automatically
 {
   const a = { id: "aaaaaaaa", autostart: true }, b = { id: "bbbbbbbb", autostart: false }, c = { id: "cccccccc", autostart: true };

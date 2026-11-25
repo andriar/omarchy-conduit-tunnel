@@ -67,5 +67,6 @@
   "paste.err.noHost": "Server SSH tidak ditemukan di perintah itu.",
   "paste.err.noForward": "Tidak ada forward -L di perintah itu.",
   "paste.err.forward": "Forward \"%1\" tidak bisa dibaca. Bentuknya harus [bind:]port:host:port.",
-  "notice.loadRepaired": "Daftar tunnel tidak terbaca utuh. Salinan berkasnya disimpan di sampingnya sebagai tunnels.json.bak.<waktu>."
+  "notice.loadRepaired": "Daftar tunnel tidak terbaca utuh. Salinan berkasnya disimpan di sampingnya sebagai tunnels.json.bak.<waktu>.",
+  "val.nameTaken": "Tunnel lain sudah memakai nama ini."
 }

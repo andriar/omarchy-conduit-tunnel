@@ -60,7 +60,7 @@ find_wayland_display() {
 start_unit() {
   local target="${TARGET:-}" lp="${LP:-}" rh="${RH:-}" rp="${RP:-}"
   # Validate again here: this script is the last line of defence before ssh runs.
-  [[ $target =~ ^[A-Za-z0-9._][A-Za-z0-9._:-]*(@[A-Za-z0-9._:-]+)?$ ]] || fail "invalid SSH server"
+  [[ $target =~ ^[A-Za-z0-9._][A-Za-z0-9._:-]*(@[A-Za-z0-9._:][A-Za-z0-9._:-]*)?$ ]] || fail "invalid SSH server"
   [[ $rh =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid remote host"
   if ! [[ $lp =~ ^[0-9]+$ ]] || (( 10#$lp < 1024 || 10#$lp > 65535 )); then fail "invalid local port"; fi
   if ! [[ $rp =~ ^[0-9]+$ ]] || (( 10#$rp < 1 || 10#$rp > 65535 )); then fail "invalid remote port"; fi

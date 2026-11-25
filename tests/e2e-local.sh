@@ -150,6 +150,7 @@ ctl "${ids[0]}" ok 45931 stop
 # 8. ports with a leading zero are refused by the script, as the form refuses them
 check "leading-zero local port is refused" bash -c "! TID=${ids[0]} TARGET=ok LP=09 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh start 2>/dev/null"
 check "leading-zero remote port is refused" bash -c "! TID=${ids[0]} TARGET=ok LP=45931 RH=db.example RP=0005432x bash scripts/tunnel-ctl.sh start 2>/dev/null"
+check "a host that starts with a dash after @ is refused" bash -c "! TID=${ids[0]} TARGET=me@-host LP=45931 RH=db.example RP=5432 bash scripts/tunnel-ctl.sh start 2>/dev/null"
 check "no unit was created by the refused starts" test "$(systemctl --user is-active "conduit-tunnel-${ids[0]}.service" 2>/dev/null)" != active
 
 # 9. an error from an earlier run is not shown for the next run

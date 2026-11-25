@@ -181,10 +181,21 @@ Panel {
     var dropped = Model.detectDrops(root.tunnels, root.states, root.prevState, root.manualStop, root.busyId)
     for (var i = 0; i < dropped.length; i++) {
       var t = root.tunnelById(dropped[i])
-      Quickshell.execDetached(["notify-send", "-u", "critical", strings.t("notice.droppedTitle"),
-        strings.t("notice.dropped").arg(t.name).arg(root.reasonText(t, root.states[t.id]))])
+      root.notify(strings.t("notice.droppedTitle"),
+        strings.t("notice.dropped").arg(t.name).arg(root.reasonText(t, root.states[t.id])), true)
     }
     root.runAutostart()
+  }
+
+  // Names are the user's own text, but may come from a pasted command: "--" stops a leading "-"
+  // being read as an option, and markup is escaped for notification daemons that render it.
+  function notify(summary, body, critical, timeoutMs) {
+    var esc = function(x) { return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+    var cmd = ["notify-send"]
+    if (critical) cmd.push("-u", "critical")
+    if (timeoutMs) cmd.push("-t", String(timeoutMs))
+    cmd.push("--", esc(summary), esc(body))
+    Quickshell.execDetached(cmd)
   }
 
   // ---- start / stop --------------------------------------------------------
@@ -213,7 +224,7 @@ Panel {
   function copyAddress(t) {
     var addr = Model.address(t)
     Quickshell.execDetached(["wl-copy", addr])
-    Quickshell.execDetached(["notify-send", "-t", "2000", "Conduit", strings.t("notice.copied").arg(addr)])
+    root.notify("Conduit", strings.t("notice.copied").arg(addr), false, 2000)
   }
 
   // ---- add / edit ----------------------------------------------------------
@@ -287,7 +298,7 @@ Panel {
   function saveForm(startAfter) {
     if (saveProc.running || !nameFieldItem) return
     var candidate = {
-      id: root.editId !== "" ? root.editId : Model.newId(),
+      id: root.editId !== "" ? root.editId : Model.newId(root.tunnels.map(function(x) { return x.id })),
       name: String(nameFieldItem.text).trim(),
       target: String(serverFieldItem.text).trim(),
       localPort: String(localFieldItem.text).trim(),
@@ -325,7 +336,13 @@ Panel {
 
   property string pendingStart: ""
 
+  // A save or delete that arrives while another save is running is not lost: it runs right after.
+  property bool persistQueued: false
+  // Likewise a start/restart requested while another control command is running.
+  property var queuedCtl: null
+
   function persist() {
+    if (saveProc.running) { root.persistQueued = true; return }
     saveProc.environment = { "TUNNELS_JSON": JSON.stringify(root.tunnels, null, 2) }
     saveProc.running = true
   }
@@ -370,8 +387,7 @@ Panel {
         var lost = unreadable || (Array.isArray(raw) && raw.length > root.tunnels.length) || (body !== "" && !Array.isArray(raw))
         if (lost) {
           backupProc.running = true
-          Quickshell.execDetached(["notify-send", "-u", "critical", "Conduit",
-            strings.t("notice.loadRepaired")])
+          root.notify("Conduit", strings.t("notice.loadRepaired"), true)
         }
         root.loaded = true
         root.refresh()
@@ -398,8 +414,11 @@ Panel {
     ]
     onExited: function(exitCode) {
       root.saving = false
+      var again = root.persistQueued
+      root.persistQueued = false
+      if (again) root.persist()
       if (exitCode !== 0) {
-        Quickshell.execDetached(["notify-send", "-u", "critical", "Conduit", strings.t("notice.saveFailed")])
+        root.notify("Conduit", strings.t("notice.saveFailed"), true)
         loadProc.running = true
         return
       }
@@ -409,7 +428,7 @@ Panel {
       var t = root.tunnelById(id)
       if (t && (root.startAfterSave || Model.isRunning(root.stateOfId(id)))) {
         // A running tunnel is restarted so the new settings take effect.
-        root.runCtl("restart", t)
+        if (!root.runCtl("restart", t)) root.queuedCtl = { act: "restart", id: t.id }
       }
       root.refresh()
     }
@@ -447,8 +466,11 @@ Panel {
         var t = root.tunnelById(id)
         var msg = strings.t("notice.startFailed").arg(t ? t.name : id).arg(String(ctlErr.text).trim().substring(0, 160))
         root.setStatus(msg, true)
-        Quickshell.execDetached(["notify-send", "-u", "critical", "Conduit", msg])
+        root.notify("Conduit", msg, true)
       }
+      var q = root.queuedCtl
+      root.queuedCtl = null
+      if (q) { var qt = root.tunnelById(q.id); if (qt) root.runCtl(q.act, qt) }
       root.refresh()
     }
   }

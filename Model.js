@@ -4,9 +4,14 @@
 // and mapping states and errors to catalog keys. No QML objects in here, so it
 // runs under plain `node` in tests/model.test.js.
 
-function newId() {
-  var s = ""
-  for (var i = 0; i < 8; i++) s += Math.floor(Math.random() * 16).toString(16)
+// `taken` are ids already in use: a new id never repeats one of them.
+function newId(taken) {
+  var used = taken || []
+  var s
+  do {
+    s = ""
+    for (var i = 0; i < 8; i++) s += Math.floor(Math.random() * 16).toString(16)
+  } while (used.indexOf(s) >= 0)
   return s
 }
 
@@ -19,14 +24,18 @@ function isPort(v, min, max) {
 // These patterns are deliberately strict: the values end up on an ssh command line.
 function validate(t, others) {
   var name = String(t.name === undefined ? "" : t.name).trim()
-  if (name === "" || name.length > 40) return "val.name"
-  if (!/^[A-Za-z0-9._][A-Za-z0-9._:-]*(@[A-Za-z0-9._:-]+)?$/.test(String(t.target))) return "val.target"
+  if (name === "" || name.length > 40 || /[\u0000-\u001f\u007f]/.test(name)) return "val.name"
+  // After the "@" the host may not start with "-" either (it could be read as an option by older ssh).
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._:-]*(@[A-Za-z0-9._:][A-Za-z0-9._:-]*)?$/.test(String(t.target))) return "val.target"
   if (!isPort(t.localPort, 1024, 65535)) return "val.localPort"
   if (!/^[A-Za-z0-9._-]+$/.test(String(t.remoteHost))) return "val.remoteHost"
   if (!isPort(t.remotePort, 1, 65535)) return "val.remotePort"
   var list = others || []
   for (var i = 0; i < list.length; i++)
     if (list[i].id !== t.id && Number(list[i].localPort) === Number(t.localPort)) return "val.portTaken"
+  // Names must be unique: the command line and IPC pick a tunnel by name.
+  for (var j = 0; j < list.length; j++)
+    if (list[j].id !== t.id && String(list[j].name).trim() === name) return "val.nameTaken"
   return ""
 }
 
@@ -47,6 +56,13 @@ function clean(raw) {
       askPassword: r.askPassword === true
     }
     if (!/^[0-9a-f]{8}$/.test(t.id)) continue
+    // Only a hand-edited file can hold the same id or local port twice: keep the first, and the
+    // caller backs the file up because entries were dropped. Names are not checked here, so an
+    // older file with two equal names keeps working (it is only refused on the next edit).
+    var clash = false
+    for (var k = 0; k < out.length; k++)
+      if (out[k].id === t.id || out[k].localPort === t.localPort) clash = true
+    if (clash) continue
     if (validate(t, []) !== "") continue
     out.push(t)
   }

@@ -71,6 +71,11 @@ for c in qmllint6 qmllint /usr/lib/qt6/bin/qmllint /usr/lib/x86_64-linux-gnu/qt6
   if command -v "$c" >/dev/null 2>&1; then qmllint_bin=$(command -v "$c"); break; fi
 done
 if [[ -n $qmllint_bin ]]; then
+  # Canary: a file with a syntax error must make qmllint fail, or this check proves nothing.
+  canary=$(mktemp --suffix=.qml)
+  printf 'import QtQuick\nItem {\n  function f( {\n}\n' > "$canary"
+  if timeout 60 "$qmllint_bin" "$canary" >/dev/null 2>&1; then rm -f "$canary"; fail "qmllint did not flag a syntax error in a known-bad file (this qmllint cannot be trusted)"; fi
+  rm -f "$canary"
   if ! lint_out=$(timeout 120 "$qmllint_bin" ./*.qml 2>&1); then
     printf '%s\n' "$lint_out" | tail -25 >&2
     fail "qmllint reported a problem (run: qmllint ./*.qml)"
